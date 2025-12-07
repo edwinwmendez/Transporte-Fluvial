@@ -1,6 +1,6 @@
 # 🗄️ Gestión de Estado - Transporte Fluvial Atalaya
 
-**Stack:** React Query (TanStack Query) + Zustand
+**Stack:** React Query (TanStack Query) + Zustand + React 19
 **Última actualización:** 27 de Octubre, 2025
 
 ---

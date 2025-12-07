@@ -1,6 +1,6 @@
 # 🧩 Guía de Componentes - Transporte Fluvial Atalaya
 
-**Stack:** React 18 + TypeScript + Tailwind CSS + Shadcn/ui
+**Stack:** React 19 + TypeScript + Tailwind CSS 4 + Shadcn/ui
 **Última actualización:** 27 de Octubre, 2025
 
 ---

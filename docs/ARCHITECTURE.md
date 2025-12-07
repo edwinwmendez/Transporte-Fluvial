@@ -1,7 +1,7 @@
-# 🏗️ Arquitectura Frontend - Next.js 14 App Router
+# 🏗️ Arquitectura Frontend - Next.js 16 App Router
 
 **Proyecto:** Sistema de Transporte Fluvial Atalaya
-**Stack:** Next.js 14 + TypeScript + Tailwind CSS
+**Stack:** Next.js 16 + TypeScript + Tailwind CSS 4
 **Última actualización:** 27 de Octubre, 2025
 
 ---
@@ -22,7 +22,7 @@
 
 ### 1.1 Principios Arquitectónicos
 
-Esta aplicación Next.js 14 sigue los siguientes principios:
+Esta aplicación Next.js 16 sigue los siguientes principios:
 
 - **App Router First**: Usamos exclusivamente el nuevo App Router (no Pages Router)
 - **Server Components por Defecto**: Minimizamos el JavaScript enviado al cliente
@@ -35,7 +35,7 @@ Esta aplicación Next.js 14 sigue los siguientes principios:
 
 | Decisión | Justificación |
 |----------|---------------|
-| **Next.js 14 App Router** | SSR optimizado, mejores web vitals, file-system routing |
+| **Next.js 16 App Router** | SSR optimizado, mejores web vitals, file-system routing |
 | **TypeScript Strict Mode** | Prevención de errores en tiempo de desarrollo |
 | **Tailwind CSS** | Desarrollo rápido, bundle optimizado, consistencia visual |
 | **Shadcn/ui** | Componentes accesibles, customizables, sin dependencia pesada |
@@ -60,7 +60,7 @@ frontend/
 │   └── manifest.json               # PWA manifest
 │
 ├── src/
-│   ├── app/                        # App Router (Next.js 14)
+│   ├── app/                        # App Router (Next.js 16)
 │   │   │
 │   │   ├── (public)/              # Layout público (sin auth)
 │   │   │   ├── layout.tsx         # Layout: Navbar + Footer
@@ -289,7 +289,7 @@ frontend/
 
 ### 3.1 Diferencias Clave con Pages Router
 
-| Aspecto | Pages Router (viejo) | App Router (Next.js 14) |
+| Aspecto | Pages Router (viejo) | App Router (Next.js 16) |
 |---------|---------------------|-------------------------|
 | **Ubicación** | `/pages` | `/app` |
 | **Componentes** | Client por defecto | Server por defecto |
@@ -842,7 +842,7 @@ export default SeatMap // NO
 
 ## Referencias
 
-- [Next.js 14 Docs](https://nextjs.org/docs)
+- [Next.js 16 Docs](https://nextjs.org/docs)
 - [App Router Guide](https://nextjs.org/docs/app)
 - [Server Components](https://nextjs.org/docs/getting-started/react-essentials)
 - [Data Fetching](https://nextjs.org/docs/app/building-your-application/data-fetching)
