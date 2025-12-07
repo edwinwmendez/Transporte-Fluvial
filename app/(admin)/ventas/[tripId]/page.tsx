@@ -34,7 +34,7 @@ export default function VentasPage() {
         }
         setTrip(tripData);
 
-        const vesselData = await getVessel(tripData.vesselId);
+        const vesselData = await getVessel(tripData.embarcacionId);
         setVessel(vesselData);
       } catch (error) {
         console.error("Error al cargar datos del viaje:", error);
@@ -49,9 +49,8 @@ export default function VentasPage() {
   }, [tripId]);
 
   const handleSeatClick = (seat: any) => {
-    if (seat.status === "sold") {
-      return; // No hacer nada si el asiento ya está vendido
-    }
+    // Permitir hacer clic en todos los asientos
+    // La verificación de conflictos de tramos se hace al crear la reserva
     setSelectedSeat(seat);
     setShowSaleModal(true);
   };
@@ -111,7 +110,7 @@ export default function VentasPage() {
           </Button>
           <h1 className="text-3xl font-bold">Gestión de Ventas</h1>
           <p className="text-muted-foreground mt-2">
-            {vessel.name} - {formatDate(trip.departureDate)} {trip.departureTime}
+            {vessel.nombre} - {formatDate(trip.fechaSalida)} {trip.horaSalida}
           </p>
         </div>
         <ManifestButton tripId={tripId} />
@@ -120,18 +119,19 @@ export default function VentasPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Mapa de Asientos - Ocupa 2 columnas */}
         <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Mapa de Asientos</CardTitle>
-              <CardDescription>
+          <Card className="shadow-xl border-2">
+            <CardHeader className="pb-4">
+              <CardTitle className="text-2xl">Mapa de Asientos</CardTitle>
+              <CardDescription className="text-base">
                 Haz clic en un asiento disponible para registrar una venta
               </CardDescription>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-0">
               <SeatMap
                 tripId={tripId}
-                rows={vessel.rows}
-                columns={vessel.columns}
+                rutaId={trip.rutaId}
+                rows={vessel.filas}
+                columns={vessel.columnas}
                 onSeatClick={handleSeatClick}
                 selectedSeatId={selectedSeat?.id}
               />
@@ -146,9 +146,10 @@ export default function VentasPage() {
       </div>
 
       {/* Modal de Venta Rápida */}
-      {showSaleModal && selectedSeat && (
+      {showSaleModal && selectedSeat && trip && (
         <QuickSaleModal
           tripId={tripId}
+          rutaId={trip.rutaId}
           seat={selectedSeat}
           open={showSaleModal}
           onOpenChange={setShowSaleModal}

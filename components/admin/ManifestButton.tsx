@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, Loader2 } from "lucide-react";
+import { FileText, Eye, Loader2 } from "lucide-react";
 import { getTrip, getVessel, getBookingsForTrip, getSeatsForTrip } from "@/lib/firestore-helpers";
-import { generateManifestPDF } from "@/lib/pdf-generator";
+import { ManifestPreviewModal } from "./ManifestPreviewModal";
+import type { Trip, Vessel, Booking, Seat } from "@/lib/firestore-helpers";
 
 interface ManifestButtonProps {
   tripId: string;
@@ -13,8 +14,15 @@ interface ManifestButtonProps {
 export function ManifestButton({ tripId }: ManifestButtonProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const [manifestData, setManifestData] = useState<{
+    trip: Trip;
+    vessel: Vessel;
+    bookings: Booking[];
+    seats: Seat[];
+  } | null>(null);
 
-  const handleGenerateManifest = async () => {
+  const handlePreviewManifest = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -30,7 +38,7 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
         throw new Error("Viaje no encontrado");
       }
 
-      const vessel = await getVessel(trip.vesselId);
+      const vessel = await getVessel(trip.embarcacionId);
       if (!vessel) {
         throw new Error("Embarcación no encontrada");
       }
@@ -40,43 +48,52 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
         return;
       }
 
-      // Generar PDF
-      generateManifestPDF({
-        trip,
-        vessel,
-        bookings,
-        seats,
-      });
+      // Guardar datos y mostrar preview
+      setManifestData({ trip, vessel, bookings, seats });
+      setShowPreview(true);
     } catch (err: any) {
-      console.error("Error al generar manifiesto:", err);
-      setError(err.message || "Error al generar el manifiesto");
+      console.error("Error al cargar datos del manifiesto:", err);
+      setError(err.message || "Error al cargar el manifiesto");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex flex-col items-end gap-2">
-      <Button
-        onClick={handleGenerateManifest}
-        disabled={loading}
-        className="gap-2"
-      >
-        {loading ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Generando...
-          </>
-        ) : (
-          <>
-            <FileText className="h-4 w-4" />
-            Imprimir Manifiesto
-          </>
+    <>
+      <div className="flex flex-col items-end gap-2">
+        <Button
+          onClick={handlePreviewManifest}
+          disabled={loading}
+          className="gap-2"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Cargando...
+            </>
+          ) : (
+            <>
+              <Eye className="h-4 w-4" />
+              Ver Manifiesto
+            </>
+          )}
+        </Button>
+        {error && (
+          <p className="text-xs text-destructive">{error}</p>
         )}
-      </Button>
-      {error && (
-        <p className="text-xs text-destructive">{error}</p>
+      </div>
+
+      {showPreview && manifestData && (
+        <ManifestPreviewModal
+          open={showPreview}
+          onOpenChange={setShowPreview}
+          trip={manifestData.trip}
+          vessel={manifestData.vessel}
+          bookings={manifestData.bookings}
+          seats={manifestData.seats}
+        />
       )}
-    </div>
+    </>
   );
 }

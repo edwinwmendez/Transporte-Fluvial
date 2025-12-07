@@ -23,7 +23,7 @@ export function TripCard({ trip }: TripCardProps) {
     async function loadTripData() {
       try {
         const [vesselData, seatsData] = await Promise.all([
-          getVessel(trip.vesselId),
+          getVessel(trip.embarcacionId),
           getSeatsForTrip(trip.id),
         ]);
         setVessel(vesselData);
@@ -48,8 +48,8 @@ export function TripCard({ trip }: TripCardProps) {
     });
   };
 
-  const soldSeats = seats.filter((s) => s.status === "sold").length;
-  const totalSeats = seats.length || vessel?.capacity || 0;
+  const soldSeats = seats.filter((s) => s.estado === "vendido").length;
+  const totalSeats = seats.length || vessel?.capacidad || 0;
   const availableSeats = totalSeats - soldSeats;
   const occupancyPercentage = totalSeats > 0 ? (soldSeats / totalSeats) * 100 : 0;
 
@@ -58,20 +58,20 @@ export function TripCard({ trip }: TripCardProps) {
       <CardHeader>
         <div className="flex items-start justify-between">
           <div className="space-y-1">
-            <CardTitle className="text-xl">Viaje {trip.departureTime}</CardTitle>
+            <CardTitle className="text-xl">Viaje {trip.horaSalida}</CardTitle>
             <CardDescription className="flex items-center gap-2 mt-2">
               <Calendar className="h-4 w-4" />
-              {formatDate(trip.departureDate)}
+              {formatDate(trip.fechaSalida)}
             </CardDescription>
           </div>
           <div
             className={`px-3 py-1 rounded-full text-xs font-medium ${
-              trip.status === "scheduled"
+              trip.estado === "programado"
                 ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
                 : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
             }`}
           >
-            {trip.status === "scheduled" ? "Programado" : trip.status}
+            {trip.estado === "programado" ? "Programado" : trip.estado}
           </div>
         </div>
       </CardHeader>
@@ -79,7 +79,7 @@ export function TripCard({ trip }: TripCardProps) {
         {vessel && (
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Ship className="h-4 w-4" />
-            <span>{vessel.name}</span>
+            <span>{vessel.nombre}</span>
           </div>
         )}
 

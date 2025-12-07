@@ -8,7 +8,7 @@ interface ManifestData {
   seats?: Seat[]; // Opcional: si se proporciona, se usa para obtener seatNumber
 }
 
-export function generateManifestPDF(data: ManifestData): void {
+export function generateManifestPDF(data: ManifestData): Blob {
   const { trip, vessel, bookings, seats } = data;
 
   // Crear documento PDF
@@ -47,11 +47,11 @@ export function generateManifestPDF(data: ManifestData): void {
   };
 
   yPosition += 5;
-  doc.text(`Embarcación: ${vessel.name}`, margin, yPosition);
+  doc.text(`Embarcación: ${vessel.nombre}`, margin, yPosition);
   yPosition += 6;
-  doc.text(`Fecha: ${formatDate(trip.departureDate)}`, margin, yPosition);
+  doc.text(`Fecha: ${formatDate(trip.fechaSalida)}`, margin, yPosition);
   yPosition += 6;
-  doc.text(`Hora de Salida: ${trip.departureTime}`, margin, yPosition);
+  doc.text(`Hora de Salida: ${trip.horaSalida}`, margin, yPosition);
   yPosition += 6;
   doc.text(`Total de Pasajeros: ${bookings.length}`, margin, yPosition);
   yPosition += 10;
@@ -89,23 +89,23 @@ export function generateManifestPDF(data: ManifestData): void {
       yPosition = margin;
     }
 
-    // Obtener seatNumber del asiento si está disponible
+    // Obtener numeroAsiento del asiento si está disponible
     let seatNumber = "N/A";
     if (seats) {
-      const seat = seats.find((s) => s.id === booking.seatId);
-      seatNumber = seat?.seatNumber || booking.seatId.split("_").pop() || "N/A";
+      const seat = seats.find((s) => s.id === booking.asientoId);
+      seatNumber = seat?.numeroAsiento || booking.asientoId.split("_").pop() || "N/A";
     } else {
-      // Fallback: intentar extraer del seatId
-      seatNumber = booking.seatId.split("_").pop() || "N/A";
+      // Fallback: intentar extraer del asientoId
+      seatNumber = booking.asientoId.split("_").pop() || "N/A";
     }
 
     const row = [
       (index + 1).toString(),
-      booking.passengerName,
-      booking.passengerDni,
-      booking.passengerPhone,
+      booking.nombrePasajero,
+      booking.dniPasajero,
+      booking.telefonoPasajero,
       seatNumber,
-      `S/ ${booking.amount.toFixed(2)}`,
+      `S/ ${booking.monto.toFixed(2)}`,
     ];
 
     xPosition = margin;
@@ -127,7 +127,7 @@ export function generateManifestPDF(data: ManifestData): void {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  const totalAmount = bookings.reduce((sum, b) => sum + b.amount, 0);
+  const totalAmount = bookings.reduce((sum, b) => sum + b.monto, 0);
   doc.text(
     `TOTAL RECAUDADO: S/ ${totalAmount.toFixed(2)}`,
     pageWidth - margin,
@@ -146,7 +146,6 @@ export function generateManifestPDF(data: ManifestData): void {
     { align: "center" }
   );
 
-  // Descargar PDF
-  const fileName = `Manifiesto_${vessel.name}_${formatDate(trip.departureDate).replace(/\s/g, "_")}.pdf`;
-  doc.save(fileName);
+  // Retornar el blob del PDF (no descargar directamente)
+  return doc.output("blob");
 }

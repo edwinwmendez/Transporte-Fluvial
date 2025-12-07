@@ -24,17 +24,17 @@ export function CashSummaryCard({ tripId }: CashSummaryCardProps) {
   }, [tripId]);
 
   // Calcular totales
-  const total = bookings.reduce((sum, booking) => sum + booking.amount, 0);
+  const total = bookings.reduce((sum, booking) => sum + booking.monto, 0);
   const byMethod = {
     efectivo: bookings
-      .filter((b) => b.paymentMethod === "efectivo")
-      .reduce((sum, b) => sum + b.amount, 0),
+      .filter((b) => b.metodoPago === "efectivo")
+      .reduce((sum, b) => sum + b.monto, 0),
     yape: bookings
-      .filter((b) => b.paymentMethod === "yape")
-      .reduce((sum, b) => sum + b.amount, 0),
+      .filter((b) => b.metodoPago === "yape")
+      .reduce((sum, b) => sum + b.monto, 0),
     plin: bookings
-      .filter((b) => b.paymentMethod === "plin")
-      .reduce((sum, b) => sum + b.amount, 0),
+      .filter((b) => b.metodoPago === "plin")
+      .reduce((sum, b) => sum + b.monto, 0),
   };
 
   const formatCurrency = (amount: number) => {
