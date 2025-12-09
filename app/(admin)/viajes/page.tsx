@@ -10,7 +10,10 @@ import {
   getAllVessels,
   getRoute,
   getVessel,
+  getHorariosActivos,
+  generarViajesDesdeHorario,
 } from "@/lib/firestore-helpers";
+import type { HorarioRecurrente } from "@/lib/firestore-helpers";
 import type { Trip, Route, Vessel } from "@/lib/firestore-helpers";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -24,7 +27,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Plus, Pencil, Trash2, Calendar, Clock, MapPin, Ship } from "lucide-react";
+import { Loader2, Plus, Pencil, Trash2, Calendar, Clock, MapPin, Ship, Play } from "lucide-react";
 import { Timestamp } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
@@ -40,10 +43,18 @@ export default function ViajesPage() {
   const [viajesFiltrados, setViajesFiltrados] = useState<Trip[]>([]);
   const [rutas, setRutas] = useState<Route[]>([]);
   const [embarcaciones, setEmbarcaciones] = useState<Vessel[]>([]);
+  const [horarios, setHorarios] = useState<HorarioRecurrente[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
+  const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [editingTrip, setEditingTrip] = useState<Trip | null>(null);
+  const [selectedHorario, setSelectedHorario] = useState<HorarioRecurrente | null>(null);
   const [filtroEstado, setFiltroEstado] = useState<string>("todos");
+  const [generating, setGenerating] = useState(false);
+  const [generateData, setGenerateData] = useState({
+    fechaInicio: "",
+    fechaFin: "",
+  });
   const [formData, setFormData] = useState({
     rutaId: "",
     embarcacionId: "",
@@ -60,14 +71,16 @@ export default function ViajesPage() {
   async function loadData() {
     try {
       setLoading(true);
-      const [tripsData, routesData, vesselsData] = await Promise.all([
+      const [tripsData, routesData, vesselsData, horariosData] = await Promise.all([
         getAllTrips(),
         getAllRoutes(),
         getAllVessels(),
+        getHorariosActivos(),
       ]);
       setViajes(tripsData);
       setRutas(routesData.filter((r) => r.activa));
       setEmbarcaciones(vesselsData.filter((v) => v.activa));
+      setHorarios(horariosData);
       // Aplicar filtro inicial
       aplicarFiltro(tripsData, filtroEstado);
     } catch (error) {
@@ -121,6 +134,65 @@ export default function ViajesPage() {
   function handleCloseDialog() {
     setShowDialog(false);
     setEditingTrip(null);
+  }
+
+  async function handleGenerateFromHorarios() {
+    if (!generateData.fechaInicio || !generateData.fechaFin) {
+      toast.error("Completa las fechas de inicio y fin");
+      return;
+    }
+
+    const fechaInicio = new Date(generateData.fechaInicio);
+    const fechaFin = new Date(generateData.fechaFin);
+
+    if (fechaFin < fechaInicio) {
+      toast.error("La fecha de fin debe ser posterior a la fecha de inicio");
+      return;
+    }
+
+    if (horarios.length === 0) {
+      toast.error("No hay horarios activos disponibles");
+      return;
+    }
+
+    try {
+      setGenerating(true);
+      let totalGenerados = 0;
+      const resultados: string[] = [];
+
+      for (const horario of horarios) {
+        try {
+          const viajesCreados = await generarViajesDesdeHorario(
+            horario.id,
+            fechaInicio,
+            fechaFin
+          );
+          totalGenerados += viajesCreados.length;
+          if (viajesCreados.length > 0) {
+            resultados.push(`${horario.nombre}: ${viajesCreados.length} viajes`);
+          }
+        } catch (error) {
+          console.error(`Error al generar viajes para ${horario.nombre}:`, error);
+        }
+      }
+
+      if (totalGenerados === 0) {
+        toast.info("Todos los viajes para este rango ya existen");
+      } else {
+        toast.success(
+          `Se generaron ${totalGenerados} viaje${totalGenerados !== 1 ? "s" : ""} exitosamente. ` +
+          (resultados.length > 0 ? `Detalles: ${resultados.join(", ")}` : "")
+        );
+      }
+
+      setShowGenerateDialog(false);
+      loadData();
+    } catch (error) {
+      console.error("Error al generar viajes:", error);
+      toast.error(error instanceof Error ? error.message : "Error al generar los viajes");
+    } finally {
+      setGenerating(false);
+    }
   }
 
   async function handleSubmit() {
@@ -239,10 +311,41 @@ export default function ViajesPage() {
             Administra los viajes programados. Los asientos se generan automáticamente.
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nuevo Viaje
-        </Button>
+        <div className="flex gap-2">
+          {horarios.length > 0 && (
+            <Button
+              variant="outline"
+              onClick={() => {
+                const hoy = new Date();
+                const proximoMes = new Date(hoy);
+                proximoMes.setMonth(proximoMes.getMonth() + 1);
+                proximoMes.setDate(1);
+
+                const finMes = new Date(proximoMes);
+                finMes.setMonth(finMes.getMonth() + 1);
+                finMes.setDate(0);
+
+                setGenerateData({
+                  fechaInicio: proximoMes.toISOString().split("T")[0],
+                  fechaFin: finMes.toISOString().split("T")[0],
+                });
+                setShowGenerateDialog(true);
+              }}
+              disabled={generating}
+            >
+              {generating ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Play className="mr-2 h-4 w-4" />
+              )}
+              Generar desde Horarios
+            </Button>
+          )}
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Viaje
+          </Button>
+        </div>
       </div>
 
       {/* Filtro de Estado */}
@@ -423,6 +526,81 @@ export default function ViajesPage() {
             <Button onClick={handleSubmit} disabled={saving}>
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingTrip ? "Actualizar" : "Crear"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog de Generación Masiva desde Horarios */}
+      <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Generar Viajes desde Horarios Recurrentes</DialogTitle>
+            <DialogDescription>
+              Genera viajes automáticamente para todos los horarios activos en el rango de fechas
+              especificado
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="fechaInicioGen">Fecha Inicio *</Label>
+                <Input
+                  id="fechaInicioGen"
+                  type="date"
+                  value={generateData.fechaInicio}
+                  onChange={(e) =>
+                    setGenerateData({ ...generateData, fechaInicio: e.target.value })
+                  }
+                  min={new Date().toISOString().split("T")[0]}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="fechaFinGen">Fecha Fin *</Label>
+                <Input
+                  id="fechaFinGen"
+                  type="date"
+                  value={generateData.fechaFin}
+                  onChange={(e) =>
+                    setGenerateData({ ...generateData, fechaFin: e.target.value })
+                  }
+                  min={generateData.fechaInicio || new Date().toISOString().split("T")[0]}
+                />
+              </div>
+            </div>
+
+            {horarios.length > 0 && (
+              <div className="rounded-lg border bg-muted/30 p-3">
+                <p className="text-sm font-medium mb-2">Horarios activos ({horarios.length}):</p>
+                <ul className="text-xs text-muted-foreground space-y-1">
+                  {horarios.map((h) => (
+                    <li key={h.id}>• {h.nombre}</li>
+                  ))}
+                </ul>
+                <p className="text-xs text-muted-foreground mt-2">
+                  Los viajes que ya existen serán omitidos automáticamente
+                </p>
+              </div>
+            )}
+
+            {horarios.length === 0 && (
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
+                <p className="text-sm text-yellow-800">
+                  No hay horarios activos. Crea horarios recurrentes primero en la página de
+                  Horarios.
+                </p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowGenerateDialog(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleGenerateFromHorarios} disabled={generating || horarios.length === 0}>
+              {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Generar Viajes
             </Button>
           </DialogFooter>
         </DialogContent>

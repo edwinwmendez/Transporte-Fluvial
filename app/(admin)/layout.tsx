@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ship, LayoutDashboard, Receipt, CheckCircle2, Ticket, MapPin, Calendar, Settings } from "lucide-react";
+import { Ship, LayoutDashboard, Receipt, CheckCircle2, Ticket, MapPin, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({
@@ -57,6 +57,16 @@ export default function AdminLayout({
               <Link href="/embarcaciones">
                 <Ship className="h-4 w-4" />
                 Embarcaciones
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/horarios">
+                <Clock className="h-4 w-4" />
+                Horarios
               </Link>
             </Button>
             <Button

@@ -65,6 +65,22 @@ export interface Trip {
   updatedAt: Timestamp;
 }
 
+// ============================================================================
+// HORARIOS RECURRENTES (Programación de Viajes)
+// ============================================================================
+
+export interface HorarioRecurrente {
+  id: string;
+  nombre: string; // Ej: "Atalaya-Pucallpa Lunes/Miércoles/Viernes 6AM"
+  rutaId: string;
+  embarcacionId: string;
+  diasSemana: number[]; // [1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado, 0=Domingo]
+  horaSalida: string; // "06:00"
+  activo: boolean;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+}
+
 export interface Seat {
   id: string;
   viajeId: string; // Renombrado de 'tripId'
@@ -1171,5 +1187,328 @@ export async function deleteTrip(tripId: string): Promise<void> {
   } catch (error) {
     console.error('Error al eliminar viaje:', error);
     throw new Error('No se pudo eliminar el viaje');
+  }
+}
+
+// ============================================================================
+// CRUD HORARIOS RECURRENTES
+// ============================================================================
+
+// Obtener todos los horarios recurrentes
+export async function getAllHorariosRecurrentes(): Promise<HorarioRecurrente[]> {
+  try {
+    const horariosRef = collection(db, 'horariosRecurrentes');
+    const q = query(horariosRef, orderBy('nombre', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as HorarioRecurrente[];
+  } catch (error) {
+    console.error('Error al obtener horarios recurrentes:', error);
+    throw new Error('No se pudieron obtener los horarios recurrentes');
+  }
+}
+
+// Obtener horarios activos
+export async function getHorariosActivos(): Promise<HorarioRecurrente[]> {
+  try {
+    const horariosRef = collection(db, 'horariosRecurrentes');
+    const q = query(
+      horariosRef,
+      where('activo', '==', true),
+      orderBy('nombre', 'asc')
+    );
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as HorarioRecurrente[];
+  } catch (error) {
+    console.error('Error al obtener horarios activos:', error);
+    throw new Error('No se pudieron obtener los horarios activos');
+  }
+}
+
+// Crear nuevo horario recurrente
+export async function createHorarioRecurrente(
+  horarioData: Omit<HorarioRecurrente, 'id' | 'createdAt' | 'updatedAt'>
+): Promise<string> {
+  try {
+    const horariosRef = collection(db, 'horariosRecurrentes');
+    const nuevoHorario = {
+      ...horarioData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+    const docRef = await addDoc(horariosRef, nuevoHorario);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error al crear horario recurrente:', error);
+    throw new Error('No se pudo crear el horario recurrente');
+  }
+}
+
+// Actualizar horario recurrente
+export async function updateHorarioRecurrente(
+  horarioId: string,
+  updates: Partial<Omit<HorarioRecurrente, 'id' | 'createdAt'>>
+): Promise<void> {
+  try {
+    const horarioRef = doc(db, 'horariosRecurrentes', horarioId);
+    await updateDoc(horarioRef, {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al actualizar horario recurrente:', error);
+    throw new Error('No se pudo actualizar el horario recurrente');
+  }
+}
+
+// Eliminar horario recurrente
+export async function deleteHorarioRecurrente(horarioId: string): Promise<void> {
+  try {
+    const horarioRef = doc(db, 'horariosRecurrentes', horarioId);
+    await updateDoc(horarioRef, {
+      activo: false,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al eliminar horario recurrente:', error);
+    throw new Error('No se pudo eliminar el horario recurrente');
+  }
+}
+
+// ============================================================================
+// GENERACIÓN MASIVA DE VIAJES DESDE HORARIOS RECURRENTES
+// ============================================================================
+
+/**
+ * Genera viajes automáticamente desde un horario recurrente para un rango de fechas
+ * @param horarioId ID del horario recurrente
+ * @param fechaInicio Fecha de inicio del rango
+ * @param fechaFin Fecha de fin del rango
+ * @returns Array con los IDs de los viajes creados
+ */
+export async function generarViajesDesdeHorario(
+  horarioId: string,
+  fechaInicio: Date,
+  fechaFin: Date
+): Promise<string[]> {
+  try {
+    // Obtener el horario recurrente
+    const horarioRef = doc(db, 'horariosRecurrentes', horarioId);
+    const horarioSnap = await getDoc(horarioRef);
+
+    if (!horarioSnap.exists()) {
+      throw new Error('Horario recurrente no encontrado');
+    }
+
+    const horario = horarioSnap.data() as HorarioRecurrente;
+
+    if (!horario.activo) {
+      throw new Error('El horario recurrente no está activo');
+    }
+
+    // Obtener embarcación para generar asientos
+    const embarcacion = await getVessel(horario.embarcacionId);
+    if (!embarcacion) {
+      throw new Error('Embarcación no encontrada');
+    }
+
+    // Calcular todas las fechas que coinciden con los días de la semana
+    const fechas = obtenerFechasPorDiasSemana(
+      fechaInicio,
+      fechaFin,
+      horario.diasSemana
+    );
+
+    // Verificar qué viajes ya existen para evitar duplicados
+    const viajesExistentes = await verificarViajesExistentes(
+      horario.rutaId,
+      horario.embarcacionId,
+      horario.horaSalida,
+      fechas
+    );
+
+    // Filtrar fechas que no tienen viaje existente
+    const fechasParaCrear = fechas.filter(
+      (fecha) => !viajesExistentes.has(fecha.toISOString().split('T')[0])
+    );
+
+    if (fechasParaCrear.length === 0) {
+      return []; // Todos los viajes ya existen
+    }
+
+    // Crear viajes en lotes
+    const viajesCreados: string[] = [];
+    const batchSize = 10; // Crear 10 viajes por vez para no sobrecargar
+
+    for (let i = 0; i < fechasParaCrear.length; i += batchSize) {
+      const lote = fechasParaCrear.slice(i, i + batchSize);
+      const promesas = lote.map((fecha) =>
+        crearViajeDesdeHorario(horario, embarcacion, fecha)
+      );
+      const resultados = await Promise.all(promesas);
+      viajesCreados.push(...resultados);
+    }
+
+    return viajesCreados;
+  } catch (error) {
+    console.error('Error al generar viajes desde horario:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudieron generar los viajes');
+  }
+}
+
+/**
+ * Obtiene todas las fechas en un rango que coinciden con los días de la semana especificados
+ */
+function obtenerFechasPorDiasSemana(
+  inicio: Date,
+  fin: Date,
+  diasSemana: number[]
+): Date[] {
+  const fechas: Date[] = [];
+  const fechaActual = new Date(inicio);
+  fechaActual.setHours(0, 0, 0, 0);
+
+  const fechaFin = new Date(fin);
+  fechaFin.setHours(23, 59, 59, 999);
+
+  while (fechaActual <= fechaFin) {
+    const diaSemana = fechaActual.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    if (diasSemana.includes(diaSemana)) {
+      fechas.push(new Date(fechaActual));
+    }
+    fechaActual.setDate(fechaActual.getDate() + 1);
+  }
+
+  return fechas;
+}
+
+/**
+ * Verifica qué viajes ya existen para evitar duplicados
+ * Optimizado: busca todos los viajes del rango y luego filtra en memoria
+ */
+async function verificarViajesExistentes(
+  rutaId: string,
+  embarcacionId: string,
+  horaSalida: string,
+  fechas: Date[]
+): Promise<Set<string>> {
+  try {
+    if (fechas.length === 0) return new Set();
+
+    const viajesExistentes = new Set<string>();
+    const viajesRef = collection(db, 'viajes');
+
+    // Obtener el rango completo de fechas
+    const fechaMin = new Date(Math.min(...fechas.map(f => f.getTime())));
+    fechaMin.setHours(0, 0, 0, 0);
+    const fechaMax = new Date(Math.max(...fechas.map(f => f.getTime())));
+    fechaMax.setHours(23, 59, 59, 999);
+
+    // Buscar todos los viajes en el rango (más eficiente que buscar por fecha individual)
+    const q = query(
+      viajesRef,
+      where('rutaId', '==', rutaId),
+      where('embarcacionId', '==', embarcacionId),
+      where('horaSalida', '==', horaSalida),
+      where('fechaSalida', '>=', Timestamp.fromDate(fechaMin)),
+      where('fechaSalida', '<=', Timestamp.fromDate(fechaMax))
+    );
+
+    const snapshot = await getDocs(q);
+    
+    // Crear un set de fechas que ya tienen viaje
+    snapshot.docs.forEach((doc) => {
+      const viaje = doc.data() as Trip;
+      if (viaje.fechaSalida) {
+        const fechaViaje = viaje.fechaSalida.toDate ? viaje.fechaSalida.toDate() : new Date(viaje.fechaSalida);
+        const fechaStr = fechaViaje.toISOString().split('T')[0];
+        viajesExistentes.add(fechaStr);
+      }
+    });
+
+    return viajesExistentes;
+  } catch (error) {
+    console.error('Error al verificar viajes existentes:', error);
+    // Si hay error (por ejemplo, falta índice), retornar set vacío para ser conservador
+    // El sistema intentará crear los viajes y fallará si ya existen (mejor que no crear nada)
+    return new Set();
+  }
+}
+
+/**
+ * Crea un viaje individual desde un horario recurrente
+ */
+async function crearViajeDesdeHorario(
+  horario: HorarioRecurrente,
+  embarcacion: Vessel,
+  fecha: Date
+): Promise<string> {
+  const [hours, minutes] = horario.horaSalida.split(':').map(Number);
+  const fechaSalida = new Date(fecha);
+  fechaSalida.setHours(hours, minutes, 0, 0);
+
+  const tripData = {
+    rutaId: horario.rutaId,
+    embarcacionId: horario.embarcacionId,
+    fechaSalida: Timestamp.fromDate(fechaSalida),
+    horaSalida: horario.horaSalida,
+    estado: 'programado' as Trip['estado'],
+  };
+
+  return await createTrip(tripData, embarcacion);
+}
+
+/**
+ * Genera viajes automáticamente para el próximo mes desde todos los horarios activos
+ */
+export async function generarViajesProximoMes(): Promise<{
+  totalGenerados: number;
+  porHorario: Array<{ horarioId: string; nombre: string; cantidad: number }>;
+}> {
+  try {
+    const horariosActivos = await getHorariosActivos();
+    const hoy = new Date();
+    const proximoMes = new Date(hoy);
+    proximoMes.setMonth(proximoMes.getMonth() + 1);
+    proximoMes.setDate(1); // Primer día del próximo mes
+    proximoMes.setHours(0, 0, 0, 0);
+
+    const finMes = new Date(proximoMes);
+    finMes.setMonth(finMes.getMonth() + 1);
+    finMes.setDate(0); // Último día del mes
+    finMes.setHours(23, 59, 59, 999);
+
+    const resultados: Array<{ horarioId: string; nombre: string; cantidad: number }> = [];
+    let totalGenerados = 0;
+
+    for (const horario of horariosActivos) {
+      const viajesCreados = await generarViajesDesdeHorario(
+        horario.id,
+        proximoMes,
+        finMes
+      );
+      resultados.push({
+        horarioId: horario.id,
+        nombre: horario.nombre,
+        cantidad: viajesCreados.length,
+      });
+      totalGenerados += viajesCreados.length;
+    }
+
+    return {
+      totalGenerados,
+      porHorario: resultados,
+    };
+  } catch (error) {
+    console.error('Error al generar viajes del próximo mes:', error);
+    throw new Error('No se pudieron generar los viajes del próximo mes');
   }
 }
