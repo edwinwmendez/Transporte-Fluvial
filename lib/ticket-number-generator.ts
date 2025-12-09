@@ -1,10 +1,13 @@
-import { collection, query, where, getDocs, orderBy, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, limit, doc, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
 
 /**
  * Genera un número de boleto único con formato: TKT-YYYYMMDD-NNNN
  * Ejemplo: TKT-20251209-0001
- * 
+ *
+ * Usa un contador atómico en Firestore para garantizar unicidad incluso con
+ * múltiples ventas concurrentes en el mismo milisegundo.
+ *
  * @returns Número de boleto único
  */
 export async function generateTicketNumber(): Promise<string> {
@@ -12,47 +15,76 @@ export async function generateTicketNumber(): Promise<string> {
   const fechaStr = hoy.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
   const prefijo = `TKT-${fechaStr}-`;
 
-  // Buscar el último número de boleto del día
-  const reservasRef = collection(db, 'reservas');
-  const q = query(
-    reservasRef,
-    where('boleto.numeroTicket', '>=', prefijo),
-    where('boleto.numeroTicket', '<', `${prefijo}9999`),
-    orderBy('boleto.numeroTicket', 'desc'),
-    limit(1)
-  );
-
   try {
-    const snapshot = await getDocs(q);
-    
-    if (snapshot.empty) {
-      // Primer boleto del día
-      return `${prefijo}0001`;
-    }
+    // MÉTODO 1 (Principal): Contador atómico con transacción
+    // Esto garantiza unicidad incluso con ventas concurrentes
+    const counterRef = doc(db, '_counters', `tickets_${fechaStr}`);
 
-    const ultimoBoleto = snapshot.docs[0].data()?.boleto?.numeroTicket as string;
-    if (!ultimoBoleto || !ultimoBoleto.startsWith(prefijo)) {
-      return `${prefijo}0001`;
-    }
+    const numeroSecuencial = await runTransaction(db, async (transaction) => {
+      const counterDoc = await transaction.get(counterRef);
 
-    // Extraer el número secuencial
-    const numeroStr = ultimoBoleto.replace(prefijo, '');
-    const numero = parseInt(numeroStr, 10);
+      let currentCount = 0;
+      if (counterDoc.exists()) {
+        currentCount = counterDoc.data()?.count || 0;
+      }
 
-    if (isNaN(numero)) {
-      return `${prefijo}0001`;
-    }
+      const newCount = currentCount + 1;
 
-    // Incrementar y formatear con ceros a la izquierda
-    const siguienteNumero = numero + 1;
-    const numeroFormateado = siguienteNumero.toString().padStart(4, '0');
+      // Actualizar contador atómicamente
+      transaction.set(counterRef, {
+        count: newCount,
+        lastUpdated: new Date().toISOString()
+      });
 
+      return newCount;
+    });
+
+    const numeroFormateado = numeroSecuencial.toString().padStart(4, '0');
     return `${prefijo}${numeroFormateado}`;
-  } catch (error) {
-    console.error('Error al generar número de boleto:', error);
-    // Fallback: usar timestamp para garantizar unicidad
-    const timestamp = Date.now().toString().slice(-4);
-    return `${prefijo}${timestamp}`;
+
+  } catch (transactionError) {
+    console.error('Error en contador atómico, usando método de respaldo:', transactionError);
+
+    // MÉTODO 2 (Fallback): Query del último boleto (menos robusto pero funcional)
+    try {
+      const reservasRef = collection(db, 'reservas');
+      const q = query(
+        reservasRef,
+        where('boleto.numeroTicket', '>=', prefijo),
+        where('boleto.numeroTicket', '<', `${prefijo}9999`),
+        orderBy('boleto.numeroTicket', 'desc'),
+        limit(1)
+      );
+
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        return `${prefijo}0001`;
+      }
+
+      const ultimoBoleto = snapshot.docs[0].data()?.boleto?.numeroTicket as string;
+      if (!ultimoBoleto || !ultimoBoleto.startsWith(prefijo)) {
+        return `${prefijo}0001`;
+      }
+
+      const numeroStr = ultimoBoleto.replace(prefijo, '');
+      const numero = parseInt(numeroStr, 10);
+
+      if (isNaN(numero)) {
+        return `${prefijo}0001`;
+      }
+
+      const siguienteNumero = numero + 1;
+      const numeroFormateado = siguienteNumero.toString().padStart(4, '0');
+
+      return `${prefijo}${numeroFormateado}`;
+    } catch (queryError) {
+      console.error('Error en método de respaldo:', queryError);
+      // MÉTODO 3 (Último recurso): Usar UUID parcial aleatorio
+      // Esto es mejor que timestamp porque reduce probabilidad de colisión
+      const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+      return `${prefijo}${random}`;
+    }
   }
 }
 

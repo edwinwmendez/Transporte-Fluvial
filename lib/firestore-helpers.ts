@@ -135,6 +135,70 @@ export interface Booking {
 }
 
 // ============================================================================
+// VALIDACIONES DE DATOS
+// ============================================================================
+
+/**
+ * Valida que un DNI peruano sea válido
+ * DNI en Perú: 8 dígitos numéricos
+ *
+ * @param dni DNI a validar
+ * @returns true si es válido, false en caso contrario
+ */
+export function validarDNI(dni: string): boolean {
+  // DNI debe ser exactamente 8 dígitos
+  const dniRegex = /^\d{8}$/;
+  return dniRegex.test(dni.trim());
+}
+
+/**
+ * Valida que un número de teléfono celular peruano sea válido
+ * Celulares en Perú: 9 dígitos, empiezan con 9
+ *
+ * @param telefono Teléfono a validar
+ * @returns true si es válido, false en caso contrario
+ */
+export function validarTelefono(telefono: string): boolean {
+  // Celular en Perú: 9 dígitos, empieza con 9
+  const telefonoRegex = /^9\d{8}$/;
+  return telefonoRegex.test(telefono.replace(/\s/g, '')); // Remover espacios
+}
+
+/**
+ * Valida que un email sea válido (formato básico)
+ *
+ * @param email Email a validar
+ * @returns true si es válido, false en caso contrario
+ */
+export function validarEmail(email: string): boolean {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  return emailRegex.test(email.trim());
+}
+
+/**
+ * Sanitiza una cadena de texto para prevenir XSS
+ * Remueve caracteres peligrosos y limita longitud
+ *
+ * @param texto Texto a sanitizar
+ * @param maxLength Longitud máxima permitida
+ * @returns Texto sanitizado
+ */
+export function sanitizarTexto(texto: string, maxLength: number = 500): string {
+  // Remover caracteres peligrosos
+  let sanitizado = texto
+    .replace(/[<>]/g, '') // Remover < y >
+    .replace(/javascript:/gi, '') // Remover javascript:
+    .trim();
+
+  // Limitar longitud
+  if (sanitizado.length > maxLength) {
+    sanitizado = sanitizado.substring(0, maxLength);
+  }
+
+  return sanitizado;
+}
+
+// ============================================================================
 // HELPERS PRINCIPALES
 // ============================================================================
 
@@ -1366,6 +1430,7 @@ export async function generarViajesDesdeHorario(
 
 /**
  * Obtiene todas las fechas en un rango que coinciden con los días de la semana especificados
+ * Usa UTC para evitar problemas de zona horaria
  */
 function obtenerFechasPorDiasSemana(
   inicio: Date,
@@ -1373,18 +1438,30 @@ function obtenerFechasPorDiasSemana(
   diasSemana: number[]
 ): Date[] {
   const fechas: Date[] = [];
-  const fechaActual = new Date(inicio);
-  fechaActual.setHours(0, 0, 0, 0);
 
-  const fechaFin = new Date(fin);
-  fechaFin.setHours(23, 59, 59, 999);
+  // Convertir a UTC para evitar problemas de zona horaria
+  // Perú está en UTC-5 (America/Lima)
+  const fechaActual = new Date(Date.UTC(
+    inicio.getFullYear(),
+    inicio.getMonth(),
+    inicio.getDate(),
+    0, 0, 0, 0
+  ));
+
+  const fechaFin = new Date(Date.UTC(
+    fin.getFullYear(),
+    fin.getMonth(),
+    fin.getDate(),
+    23, 59, 59, 999
+  ));
 
   while (fechaActual <= fechaFin) {
-    const diaSemana = fechaActual.getDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    const diaSemana = fechaActual.getUTCDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
     if (diasSemana.includes(diaSemana)) {
       fechas.push(new Date(fechaActual));
     }
-    fechaActual.setDate(fechaActual.getDate() + 1);
+    // Incrementar día usando UTC
+    fechaActual.setUTCDate(fechaActual.getUTCDate() + 1);
   }
 
   return fechas;
@@ -1428,7 +1505,8 @@ async function verificarViajesExistentes(
     snapshot.docs.forEach((doc) => {
       const viaje = doc.data() as Trip;
       if (viaje.fechaSalida) {
-        const fechaViaje = viaje.fechaSalida.toDate ? viaje.fechaSalida.toDate() : new Date(viaje.fechaSalida);
+        // Timestamp de Firestore siempre tiene .toDate()
+        const fechaViaje = viaje.fechaSalida.toDate();
         const fechaStr = fechaViaje.toISOString().split('T')[0];
         viajesExistentes.add(fechaStr);
       }

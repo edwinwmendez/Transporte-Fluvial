@@ -22,6 +22,9 @@ import {
   obtenerOrdenParadas,
   getTrip,
   getVessel,
+  validarDNI,
+  validarTelefono,
+  sanitizarTexto,
 } from "@/lib/firestore-helpers";
 import type { Seat, Route, Booking } from "@/lib/firestore-helpers";
 import { generateTicketNumber, verificarNumeroTicketUnico } from "@/lib/ticket-number-generator";
@@ -97,29 +100,25 @@ export function QuickSaleModal({
 
         // Usar bookings precargados si están disponibles (evitar consulta duplicada)
         let puntoOrigenAvanzado: string;
-        
-        if (bookingsPrecargados && bookingsPrecargados.length >= 0) {
+
+        if (bookingsPrecargados && bookingsPrecargados.length > 0) {
           // Calcular punto de origen usando bookings precargados (más rápido)
-          if (bookingsPrecargados.length === 0) {
-            puntoOrigenAvanzado = rutaData.origen;
-          } else {
-            const orden = obtenerOrdenParadas(rutaData);
-            let maxOrden = -1;
-            let puntoMasAvanzado = rutaData.origen;
+          const orden = obtenerOrdenParadas(rutaData);
+          let maxOrden = -1;
+          let puntoMasAvanzado = rutaData.origen;
 
-            for (const reserva of bookingsPrecargados) {
-              const destinoReserva = reserva.destinoIntermedio || rutaData.destino;
-              const ordenDestino = orden.get(destinoReserva) ?? -1;
+          for (const reserva of bookingsPrecargados) {
+            const destinoReserva = reserva.destinoIntermedio || rutaData.destino;
+            const ordenDestino = orden.get(destinoReserva) ?? -1;
 
-              if (ordenDestino > maxOrden) {
-                maxOrden = ordenDestino;
-                puntoMasAvanzado = destinoReserva;
-              }
+            if (ordenDestino > maxOrden) {
+              maxOrden = ordenDestino;
+              puntoMasAvanzado = destinoReserva;
             }
-            puntoOrigenAvanzado = puntoMasAvanzado;
           }
+          puntoOrigenAvanzado = puntoMasAvanzado;
         } else {
-          // Fallback: consultar si no hay bookings precargados
+          // Fallback: consultar si no hay bookings precargados O el array está vacío
           puntoOrigenAvanzado = await obtenerPuntoOrigenMasAvanzado(
             tripId,
             seat.id,
@@ -203,9 +202,27 @@ export function QuickSaleModal({
     setLoading(true);
 
     try {
+      // ========================================================================
+      // VALIDACIONES DE ENTRADA
+      // ========================================================================
+
       // Validar campos obligatorios
       if (!formData.dni || !formData.nombre || !formData.telefono || !formData.monto) {
         setError("Por favor completa todos los campos obligatorios");
+        setLoading(false);
+        return;
+      }
+
+      // Validar formato de DNI (8 dígitos en Perú)
+      if (!validarDNI(formData.dni)) {
+        setError("El DNI debe tener exactamente 8 dígitos numéricos");
+        setLoading(false);
+        return;
+      }
+
+      // Validar formato de teléfono (9 dígitos, empieza con 9 en Perú)
+      if (!validarTelefono(formData.telefono)) {
+        setError("El teléfono debe tener 9 dígitos y empezar con 9");
         setLoading(false);
         return;
       }
@@ -217,6 +234,14 @@ export function QuickSaleModal({
         return;
       }
 
+      // Validar formato de WhatsApp si se proporciona
+      if (formData.whatsapp && !validarTelefono(formData.whatsapp)) {
+        setError("El WhatsApp debe tener 9 dígitos y empezar con 9");
+        setLoading(false);
+        return;
+      }
+
+      // Validar monto
       const monto = parseFloat(formData.monto);
       if (isNaN(monto) || monto <= 0) {
         setError("El monto debe ser un número válido mayor a 0");
@@ -231,9 +256,25 @@ export function QuickSaleModal({
       }
 
       // ========================================================================
-      // PASO 0: Crear reserva primero (necesitamos bookingId para subir screenshot)
+      // PASO 0: Subir screenshot PRIMERO si es necesario (antes de crear reserva)
       // ========================================================================
-      // Preparar datos de reserva sin screenshot (se agregará después)
+      let screenshotData: { url: string; path: string } | null = null;
+
+      if ((formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && screenshotFile) {
+        try {
+          // Generar ID temporal para el screenshot (usaremos el booking ID real después)
+          const tempId = `temp_${Date.now()}`;
+          screenshotData = await uploadPaymentScreenshot(screenshotFile, tripId, tempId);
+        } catch (uploadError) {
+          setError('Error al subir el comprobante de pago. Por favor, intenta nuevamente.');
+          setLoading(false);
+          return; // Detener la venta si falla el upload
+        }
+      }
+
+      // ========================================================================
+      // PASO 1: Preparar datos de reserva con screenshot (si existe)
+      // ========================================================================
       const datosReservaInicial: {
         nombre: string;
         dni: string;
@@ -243,14 +284,20 @@ export function QuickSaleModal({
         monto: number;
         metodoPago: 'efectivo' | 'yape' | 'plin';
         origenIntermedio?: string;
+        screenshotUrl?: string;
+        screenshotPath?: string;
       } = {
-        nombre: formData.nombre,
-        dni: formData.dni,
-        telefono: formData.telefono,
+        nombre: sanitizarTexto(formData.nombre, 200), // Sanitizar nombre
+        dni: formData.dni.trim(),
+        telefono: formData.telefono.replace(/\s/g, ''), // Remover espacios
         monto: monto,
         metodoPago: formData.metodoPago,
         origenIntermedio: puntoOrigen,
-        ...(formData.whatsapp && { whatsapp: formData.whatsapp }),
+        ...(formData.whatsapp && { whatsapp: formData.whatsapp.replace(/\s/g, '') }), // Remover espacios
+        ...(screenshotData && {
+          screenshotUrl: screenshotData.url,
+          screenshotPath: screenshotData.path
+        }),
       };
 
       if (formData.destinoIntermedio && formData.destinoIntermedio.trim() !== '' && formData.destinoIntermedio !== ruta?.destino) {
@@ -258,10 +305,10 @@ export function QuickSaleModal({
       }
 
       // ========================================================================
-      // OPTIMIZACIÓN: Ejecutar operaciones en paralelo para reducir tiempo
+      // PASO 2: Ejecutar operaciones en paralelo para reducir tiempo
       // ========================================================================
-      
-      // 1. Generar número de ticket y obtener datos del viaje EN PARALELO
+
+      // Generar número de ticket y obtener datos del viaje EN PARALELO
       const [numeroTicket, viaje] = await Promise.all([
         generateTicketNumber(), // Generar ticket
         getTrip(tripId), // Obtener viaje
@@ -271,13 +318,13 @@ export function QuickSaleModal({
         throw new Error('No se pudo obtener información del viaje');
       }
 
-      // 2. Obtener embarcación (ya tenemos viaje)
+      // Obtener embarcación (ya tenemos viaje)
       const embarcacionData = await getVessel(viaje.embarcacionId);
       if (!embarcacionData) {
         throw new Error('No se pudo obtener información de la embarcación');
       }
 
-      // 3. Preparar datos del QR
+      // Preparar datos del QR
       const qrData: QRTicketData = {
         numeroTicket,
         viajeId: tripId,
@@ -287,13 +334,13 @@ export function QuickSaleModal({
         timestamp: new Date().toISOString(),
       };
 
-      // 4. Generar QR primero (más rápido que crear reserva)
+      // Generar QR primero (más rápido que crear reserva)
       const codigoQr = await generateTicketQR(qrData, 150); // Tamaño más pequeño = generación más rápida
 
-      // 5. Crear reserva (esta es la operación más lenta, pero necesaria)
+      // Crear reserva (esta es la operación más lenta, pero necesaria)
       const bookingId = await createBooking(tripId, seat.id, datosReservaInicial, ruta);
 
-      // 6. Actualizar reserva con boleto completo (UNA SOLA operación)
+      // Actualizar reserva con boleto completo (UNA SOLA operación)
       const bookingRef = doc(db, 'reservas', bookingId);
       await updateDoc(bookingRef, {
         boleto: {
@@ -304,20 +351,6 @@ export function QuickSaleModal({
         },
         updatedAt: Timestamp.now(),
       });
-
-      // 7. Subir screenshot EN BACKGROUND (no bloquea la venta - se actualiza después)
-      if ((formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && screenshotFile) {
-        // No esperamos - se sube en background sin bloquear
-        uploadPaymentScreenshot(screenshotFile, tripId, bookingId)
-          .then((result) => {
-            updateDoc(doc(db, 'reservas', bookingId), {
-              'pago.screenshotUrl': result.url,
-              'pago.screenshotPath': result.path,
-              updatedAt: Timestamp.now(),
-            }).catch(err => console.error('Error al actualizar screenshot:', err));
-          })
-          .catch(err => console.error('Error al subir screenshot:', err));
-      }
 
       // 8. Construir bookingData directamente (evitar consulta innecesaria)
       const bookingData: Booking = {
