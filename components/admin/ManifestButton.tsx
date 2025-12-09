@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { FileText, Eye, Loader2 } from "lucide-react";
+import { FileText, Eye, Loader2, FileSpreadsheet } from "lucide-react";
 import { getTrip, getVessel, getBookingsForTrip, getSeatsForTrip } from "@/lib/firestore-helpers";
 import { ManifestPreviewModal } from "./ManifestPreviewModal";
 import type { Trip, Vessel, Booking, Seat } from "@/lib/firestore-helpers";
@@ -65,7 +65,8 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
         <Button
           onClick={handlePreviewManifest}
           disabled={loading}
-          className="gap-2"
+          variant="outline"
+          className="gap-2 font-semibold"
         >
           {loading ? (
             <>
@@ -74,13 +75,13 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
             </>
           ) : (
             <>
-              <Eye className="h-4 w-4" />
+              <FileSpreadsheet className="h-4 w-4" />
               Ver Manifiesto
             </>
           )}
         </Button>
         {error && (
-          <p className="text-xs text-destructive">{error}</p>
+          <p className="text-xs text-red-500 font-medium animate-in fade-in slide-in-from-top-1">{error}</p>
         )}
       </div>
 

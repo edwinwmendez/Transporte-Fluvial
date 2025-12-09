@@ -99,7 +99,7 @@ export interface Booking {
 export async function getTripsForTodayAndTomorrow(): Promise<Trip[]> {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
+
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(23, 59, 59, 999);
@@ -135,7 +135,7 @@ export function subscribeToSeats(
   callback: (asientos: Seat[]) => void
 ): () => void {
   const asientosRef = collection(db, `viajes/${viajeId}/asientos`);
-  
+
   return onSnapshot(asientosRef, (snapshot: QuerySnapshot<DocumentData>) => {
     const asientos = snapshot.docs.map((doc) => ({
       id: doc.id,
@@ -149,11 +149,11 @@ export function subscribeToSeats(
 export async function getTrip(viajeId: string): Promise<Trip | null> {
   const viajeRef = doc(db, 'viajes', viajeId);
   const viajeSnap = await getDoc(viajeRef);
-  
+
   if (!viajeSnap.exists()) {
     return null;
   }
-  
+
   return {
     id: viajeSnap.id,
     ...viajeSnap.data(),
@@ -164,11 +164,11 @@ export async function getTrip(viajeId: string): Promise<Trip | null> {
 export async function getRoute(rutaId: string): Promise<Route | null> {
   const rutaRef = doc(db, 'rutas', rutaId);
   const rutaSnap = await getDoc(rutaRef);
-  
+
   if (!rutaSnap.exists()) {
     return null;
   }
-  
+
   return {
     id: rutaSnap.id,
     ...rutaSnap.data(),
@@ -179,11 +179,11 @@ export async function getRoute(rutaId: string): Promise<Route | null> {
 export async function getVessel(embarcacionId: string): Promise<Vessel | null> {
   const embarcacionRef = doc(db, 'embarcaciones', embarcacionId);
   const embarcacionSnap = await getDoc(embarcacionRef);
-  
+
   if (!embarcacionSnap.exists()) {
     return null;
   }
-  
+
   return {
     id: embarcacionSnap.id,
     ...embarcacionSnap.data(),
@@ -210,7 +210,7 @@ export async function buscarPasajeroPorDni(dni: string): Promise<{
     );
 
     const snapshot = await getDocs(q);
-    
+
     if (snapshot.empty) {
       return null;
     }
@@ -236,7 +236,7 @@ export async function getBookingsForSeat(viajeId: string, asientoId: string): Pr
     where('asientoId', '==', asientoId),
     where('estado', '==', 'confirmado')
   );
-  
+
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -248,14 +248,14 @@ export async function getBookingsForSeat(viajeId: string, asientoId: string): Pr
 export function obtenerOrdenParadas(ruta: Route): Map<string, number> {
   const orden = new Map<string, number>();
   orden.set(ruta.origen, 0);
-  
+
   if (ruta.paradasIntermedias && ruta.paradasIntermedias.length > 0) {
     // Ordenar paradas por su campo 'orden' para asegurar correcto mapeo
     const paradasOrdenadas = [...ruta.paradasIntermedias].sort((a, b) => a.orden - b.orden);
     paradasOrdenadas.forEach((parada) => {
       orden.set(parada.nombre, parada.orden);
     });
-    
+
     // El destino final tiene el orden máximo de las paradas intermedias + 1
     const maxOrdenParada = Math.max(...paradasOrdenadas.map(p => p.orden));
     orden.set(ruta.destino, maxOrdenParada + 1);
@@ -263,7 +263,7 @@ export function obtenerOrdenParadas(ruta: Route): Map<string, number> {
     // Si no hay paradas intermedias, el destino final es orden 1
     orden.set(ruta.destino, 1);
   }
-  
+
   return orden;
 }
 
@@ -275,27 +275,27 @@ export async function obtenerPuntoOrigenMasAvanzado(
 ): Promise<string> {
   try {
     const reservasExistentes = await getBookingsForSeat(viajeId, asientoId);
-    
+
     if (reservasExistentes.length === 0) {
       // Si no hay reservas, el punto de origen es el origen de la ruta
       return ruta.origen;
     }
-    
+
     const orden = obtenerOrdenParadas(ruta);
     let maxOrden = -1;
     let puntoMasAvanzado = ruta.origen;
-    
+
     // Para cada reserva, determinar hasta dónde llega
     for (const reserva of reservasExistentes) {
       const destinoReserva = reserva.destinoIntermedio || ruta.destino;
       const ordenDestino = orden.get(destinoReserva) ?? -1;
-      
+
       if (ordenDestino > maxOrden) {
         maxOrden = ordenDestino;
         puntoMasAvanzado = destinoReserva;
       }
     }
-    
+
     return puntoMasAvanzado;
   } catch (error) {
     console.error('Error al obtener punto de origen más avanzado:', error);
@@ -311,34 +311,34 @@ export function estaAsientoCompletamenteOcupado(
   if (reservas.length === 0) {
     return false;
   }
-  
+
   const orden = obtenerOrdenParadas(ruta);
   const ordenDestinoFinal = orden.get(ruta.destino) ?? -1;
-  
+
   // Verificar si alguna reserva llega hasta el destino final
   for (const reserva of reservas) {
     const destinoReserva = reserva.destinoIntermedio || ruta.destino;
-    
+
     // Si la reserva no tiene destinoIntermedio, va hasta el destino final
     if (!reserva.destinoIntermedio || reserva.destinoIntermedio === ruta.destino) {
       return true; // Está completamente ocupado
     }
-    
+
     // Si el destino de la reserva es el destino final, está completamente ocupado
     const ordenDestinoReserva = orden.get(destinoReserva) ?? -1;
     if (ordenDestinoReserva === ordenDestinoFinal) {
       return true;
     }
   }
-  
+
   // Verificar si las reservas cubren todo el trayecto (desde origen hasta destino final)
   // Esto requiere verificar que no haya espacios sin cubrir
   // Por simplicidad, si hay una reserva hasta el destino final, está completamente ocupado
   // O si hay múltiples reservas que juntas cubren todo el trayecto
-  
+
   // Verificar si hay una combinación de reservas que cubra desde origen hasta destino final
   const ordenOrigen = orden.get(ruta.origen) ?? 0;
-  
+
   // Si el punto más avanzado es el destino final, está completamente ocupado
   let maxOrdenAlcanzado = ordenOrigen;
   for (const reserva of reservas) {
@@ -348,7 +348,7 @@ export function estaAsientoCompletamenteOcupado(
       maxOrdenAlcanzado = ordenDestinoReserva;
     }
   }
-  
+
   // Si el punto más avanzado alcanzado es el destino final, está completamente ocupado
   return maxOrdenAlcanzado >= ordenDestinoFinal;
 }
@@ -360,19 +360,19 @@ export function obtenerDestinosDisponiblesDesde(
 ): Array<{ nombre: string; precio: number; esDestinoFinal: boolean }> {
   const orden = obtenerOrdenParadas(ruta);
   const ordenOrigen = orden.get(puntoOrigen) ?? -1;
-  
+
   const destinos: Array<{ nombre: string; precio: number; esDestinoFinal: boolean }> = [];
-  
+
   // Si el punto de origen es el destino final, no hay destinos disponibles
   if (puntoOrigen === ruta.destino) {
     return [];
   }
-  
+
   // Si no se pudo determinar el orden del punto de origen, retornar vacío para ser conservador
   if (ordenOrigen === -1) {
     return [];
   }
-  
+
   // Agregar paradas intermedias que vienen DESPUÉS del punto de origen
   if (ruta.paradasIntermedias && ruta.paradasIntermedias.length > 0) {
     const paradasOrdenadas = [...ruta.paradasIntermedias].sort((a, b) => a.orden - b.orden);
@@ -387,7 +387,7 @@ export function obtenerDestinosDisponiblesDesde(
       }
     }
   }
-  
+
   // Siempre agregar el destino final si el punto de origen no es el destino final
   const ordenDestinoFinal = orden.get(ruta.destino) ?? -1;
   if (puntoOrigen !== ruta.destino && ordenDestinoFinal > ordenOrigen) {
@@ -397,7 +397,7 @@ export function obtenerDestinosDisponiblesDesde(
       esDestinoFinal: true,
     });
   }
-  
+
   return destinos;
 }
 
@@ -410,17 +410,17 @@ function verificarConflictoTramos(
   tramo2Destino: string
 ): boolean {
   const orden = obtenerOrdenParadas(ruta);
-  
+
   const orden1Inicio = orden.get(tramo1Origen) ?? -1;
   const orden1Fin = orden.get(tramo1Destino) ?? -1;
   const orden2Inicio = orden.get(tramo2Origen) ?? -1;
   const orden2Fin = orden.get(tramo2Destino) ?? -1;
-  
+
   // Si algún orden no existe, no podemos verificar (retornar true para ser conservador)
   if (orden1Inicio === -1 || orden1Fin === -1 || orden2Inicio === -1 || orden2Fin === -1) {
     return true;
   }
-  
+
   // Verificar solapamiento: los tramos se solapan si:
   // - El inicio del tramo2 está dentro del tramo1, O
   // - El fin del tramo2 está dentro del tramo1, O
@@ -429,7 +429,7 @@ function verificarConflictoTramos(
   const tramo1Fin = Math.max(orden1Inicio, orden1Fin);
   const tramo2Inicio = Math.min(orden2Inicio, orden2Fin);
   const tramo2Fin = Math.max(orden2Inicio, orden2Fin);
-  
+
   // Los tramos se solapan si hay intersección (pero no si uno termina exactamente donde empieza el otro)
   // Ejemplo: Atalaya->Tahuania (0-1) y Tahuania->Pucallpa (1-2) NO se solapan
   // Pero: Atalaya->Pucallpa (0-2) y Tahuania->Pucallpa (1-2) SÍ se solapan
@@ -441,25 +441,85 @@ export async function verificarDisponibilidadTramo(
   viajeId: string,
   asientoId: string,
   ruta: Route,
-  destinoSeleccionado: string
+  destinoSeleccionado: string,
+  origenPersonalizado?: string // NUEVO: Permite verificar desde un punto intermedio
 ): Promise<{ disponible: boolean; motivo?: string }> {
   try {
     // Obtener todas las reservas confirmadas del asiento
     const reservasExistentes = await getBookingsForSeat(viajeId, asientoId);
-    
+
     if (reservasExistentes.length === 0) {
       return { disponible: true };
     }
-    
+
     // Determinar el tramo de la nueva reserva
-    const origenNuevo = ruta.origen;
+    const origenNuevo = origenPersonalizado || ruta.origen;
     const destinoNuevo = destinoSeleccionado;
-    
+
     // Verificar conflictos con cada reserva existente
     for (const reserva of reservasExistentes) {
       const origenExistente = ruta.origen;
+      // TODO: Las reservas existentes también deberían tener su propio origen guardado si no empezaron en ruta.origen
+      // Por ahora asumimos que todas vienen desde ruta.origen O que el sistema ya guardó el tramo ocupado correctamente?
+      // Realmente, la reserva debería guardar 'origen' y 'destino'. 
+      // Actualmente Booking solo guarda 'destinoIntermedio'. 
+      // Asumimos conservadoramente que las reservas existentes ocupan desde [?????] hasta destinoIntermedio.
+      // CRITICAL: SI NO GUARDAMOS EL ORIGEN DE LA RESERVA, ASUMIMOS QUE EMPIEZAN EN RUTA.ORIGEN?
+      // ESO BLOQUEARÍA TRAMOS ANTERIORES LIBRES.
+      // PERO: Si la reserva existente se hizo correctamente, ocupó un tramo.
+      // Sin campo 'origen' en Booking, no podemos saber dónde empezó la reserva existente.
+      // FIX TEMPORAL / SUPOSICIÓN: Las reservas existentes ocupan el tramo que ocupan. 
+      // Si no tenemos campo origen, tenemos un problema de diseño en el modelo de datos.
+
+      // REVISIÓN DEL MODELO: Booking tiene: destinoIntermedio. NO TIENE origenIntermedio.
+      // Si yo viajo B->C, la reserva dice destino:C. Pero no dice origen:B.
+      // Si luego quiero vender A->B, ¿cómo sé que B->C no empezó en A?
+      // Si empezó en A, A->B está ocupado. Si empezó en B, A->B está libre.
+
+      // SOLUCIÓN: Necesitamos agregar `origenBooking` al modelo Booking.
+      // Si no lo hacemos, no podemos soportar bookings de tramos intermedios de forma robusta.
+      // El usuario dijo "el asiento estaba considerado una ruta de Atalaya - Tahuania". 
+      // Eso implica que el sistema "sabe" el tramo.
+      // Pero viendo la interfaz Booking:
+      /*
+      export interface Booking {
+        ...
+        destinoIntermedio?: string;
+        ...
+      }
+      */
+      // No hay origen.
+      // Sin embargo, para no romper todo el esquema de datos ahora mismo (User rule: "not change data model... unless absolutely necessary"),
+      // vamos a asumir que si hay un conflicto, hay un conflicto.
+      // Pero espera, para `verificarConflictoTramos` necesitamos `origenExistente`.
+      // Si usamos `ruta.origen` siempre para reservas existentes, estamos asumiendo que SIEMPRE empiezan al inicio.
+      // Esto significa que si alguien compra B->C, el sistema pensará que compró A->C.
+      // Y bloqueará A->B.
+      // Esto es un bug de diseño fundamental si queremos "saltos".
+      // PERO, para arreglar el bug del usuario (vender el tramo SIGUIENTE), 
+      // Si el usuario tiene A->B. Quiere vender B->C.
+      // Nuevo: B->C. Existente: A->B.
+      // Solapamiento? 
+      // A->B (0-1). B->C (1-2). NO solapan.
+      // ESTO SÍ FUNCIONA incluso si asumimos que el existente empieza en A.
+
+      // EL PROBLEMA REAL DEL USUARIO FUE:
+      // "El asiento está ocupado desde Atalaya hasta Tahuania".
+      // Significa conflicto detectado.
+      // Si el usuario intentó vender B->C, y el sistema usó A->C (porque forzó origen A),
+      // Nuevo (imaginado por sistema): A->C (0-2).
+      // Existente: A->B (0-1).
+      // Solapan? SÍ. (0-2 contiene a 0-1, o interceptan).
+
+      // POR LO TANTO: Solo permitiendo definir el origen NUEVO arreglamos el caso de "vender el siguiente tramo".
+      // El caso inverso ("vender el tramo anterior a uno existente") SÍ requiere cambio de modelo, 
+      // pero para "vender el siguiente" (que es lo común, ir llenando el bote), basta con corregir el input actual.
+
       const destinoExistente = reserva.destinoIntermedio || ruta.destino;
-      
+      // Asumimos origenExistente = ruta.origen para bookings viejos, o idealmente leeríamos reserva.origen (si existiera).
+      // Dado que no podemos cambiar la BD fácilmente ahora, mantenemos esta asunción que es "segura" (consevadora, bloquea más de lo necesario pero no permite overbooking).
+      // const origenExistente = ruta.origen; // REMOVED DUPLICATE
+
       if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
         return {
           disponible: false,
@@ -467,7 +527,7 @@ export async function verificarDisponibilidadTramo(
         };
       }
     }
-    
+
     return { disponible: true };
   } catch (error) {
     console.error('Error al verificar disponibilidad:', error);
@@ -486,73 +546,72 @@ export async function createBooking(
     destinoIntermedio?: string; // Parada donde se baja
     monto: number;
     metodoPago: 'efectivo' | 'yape' | 'plin';
+    origenIntermedio?: string; // NUEVO: Parada donde sube
   },
-  ruta: Route // NUEVO: Ruta necesaria para verificar conflictos de tramos
+  ruta: Route
 ): Promise<string> {
   try {
     // Verificar disponibilidad del tramo ANTES de la transacción
     const destinoSeleccionado = datosPasajero.destinoIntermedio || ruta.destino;
+    const origenSeleccionado = datosPasajero.origenIntermedio || ruta.origen;
+
     const disponibilidad = await verificarDisponibilidadTramo(
       viajeId,
       asientoId,
       ruta,
-      destinoSeleccionado
+      destinoSeleccionado,
+      origenSeleccionado
     );
-    
+
     if (!disponibilidad.disponible) {
       throw new Error(disponibilidad.motivo || 'El asiento no está disponible para este tramo');
     }
-    
-    // Obtener reservas existentes ANTES de la transacción para verificación
+
+    // Obtener reservas existentes ANTES de la transacción
     const reservasExistentes = await getBookingsForSeat(viajeId, asientoId);
-    
-    // Verificar conflictos con cada reserva existente
-    const origenNuevo = ruta.origen;
+
+    const origenNuevo = origenSeleccionado;
     const destinoNuevo = destinoSeleccionado;
-    
+
     for (const reserva of reservasExistentes) {
-      const origenExistente = ruta.origen;
+      const origenExistente = ruta.origen; // Ver nota arriba sobre limitación del modelo
       const destinoExistente = reserva.destinoIntermedio || ruta.destino;
-      
+
       if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
         throw new Error(`El asiento está ocupado desde ${origenExistente} hasta ${destinoExistente}`);
       }
     }
-    
+
     const reservaId = await runTransaction(db, async (transaction) => {
-      // Verificar que el asiento existe
       const asientoRef = doc(db, `viajes/${viajeId}/asientos`, asientoId);
       const asientoSnap = await transaction.get(asientoRef);
-      
+
       if (!asientoSnap.exists()) {
         throw new Error('El asiento no existe');
       }
-      
-      // Verificar dentro de la transacción que las reservas no hayan cambiado
-      // (doble verificación para evitar condiciones de carrera)
+
+      // Re-verificación dentro de transacción
       for (const reservaExistente of reservasExistentes) {
         const reservaRef = doc(db, 'reservas', reservaExistente.id);
         const reservaSnap = await transaction.get(reservaRef);
-        
+
         if (!reservaSnap.exists() || reservaSnap.data()?.estado !== 'confirmado') {
-          // La reserva fue cancelada, continuar
           continue;
         }
-        
+
         const reservaData = reservaSnap.data() as Booking;
         const origenExistente = ruta.origen;
         const destinoExistente = reservaData.destinoIntermedio || ruta.destino;
-        
+
         if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
           throw new Error(`El asiento está ocupado desde ${origenExistente} hasta ${destinoExistente}`);
         }
       }
-      
+
       // Crear reserva
       const reservasRef = collection(db, 'reservas');
       const nuevaReservaRef = doc(reservasRef);
-      
-      // Construir objeto de reserva sin campos undefined
+
       const reservaBase: Omit<Booking, 'id'> = {
         viajeId,
         asientoId,
@@ -564,28 +623,26 @@ export async function createBooking(
         estado: 'confirmado',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
+        // TODO: En el futuro, agregar origenIntermedio al modelo Booking
       };
-      
+
       // Solo agregar destinoIntermedio si tiene un valor válido
       const reserva: Omit<Booking, 'id'> = datosPasajero.destinoIntermedio && datosPasajero.destinoIntermedio.trim() !== ''
         ? { ...reservaBase, destinoIntermedio: datosPasajero.destinoIntermedio }
         : reservaBase;
-      
+
       transaction.set(nuevaReservaRef, reserva);
-      
-      // NO actualizar el estado del asiento a "vendido" si hay paradas intermedias
-      // El asiento puede tener múltiples reservas para diferentes tramos
-      // Solo actualizar updatedAt para mantener consistencia
+
       transaction.update(asientoRef, {
         updatedAt: Timestamp.now(),
       });
-      
+
       return nuevaReservaRef.id;
     });
-    
+
     return reservaId;
   } catch (error) {
-    console.error('Error al crear reserva:', error);
+    // console.error('Error al crear reserva:', error); // Redondante si ya se maneja fuera
     throw error;
   }
 }
@@ -594,7 +651,7 @@ export async function createBooking(
 export async function getBookingsForTrip(viajeId: string): Promise<Booking[]> {
   const reservasRef = collection(db, 'reservas');
   const q = query(reservasRef, where('viajeId', '==', viajeId));
-  
+
   const snapshot = await getDocs(q);
   return snapshot.docs.map((doc) => ({
     id: doc.id,
@@ -613,7 +670,7 @@ export async function getCashSummaryForTrip(viajeId: string): Promise<{
   cantidadReservas: number;
 }> {
   const reservas = await getBookingsForTrip(viajeId);
-  
+
   const resumen = {
     total: 0,
     porMetodo: {
@@ -623,12 +680,12 @@ export async function getCashSummaryForTrip(viajeId: string): Promise<{
     },
     cantidadReservas: reservas.length,
   };
-  
+
   reservas.forEach((reserva) => {
     resumen.total += reserva.monto;
     resumen.porMetodo[reserva.metodoPago] += reserva.monto;
   });
-  
+
   return resumen;
 }
 
@@ -639,7 +696,7 @@ export function subscribeToBookings(
 ): () => void {
   const reservasRef = collection(db, 'reservas');
   const q = query(reservasRef, where('viajeId', '==', viajeId));
-  
+
   return onSnapshot(q, (snapshot: QuerySnapshot<DocumentData>) => {
     const reservas = snapshot.docs.map((doc) => ({
       id: doc.id,

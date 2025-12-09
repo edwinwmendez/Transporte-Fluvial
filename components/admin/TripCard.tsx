@@ -1,13 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Calendar, Clock, Ship, ArrowRight } from "lucide-react";
 import type { Trip } from "@/lib/firestore-helpers";
 import { useEffect, useState } from "react";
 import { getVessel, getSeatsForTrip } from "@/lib/firestore-helpers";
 import type { Vessel, Seat } from "@/lib/firestore-helpers";
+import { cn } from "@/lib/utils";
 
 interface TripCardProps {
   trip: Trip;
@@ -45,6 +46,7 @@ export function TripCard({ trip }: TripCardProps) {
       day: "2-digit",
       month: "short",
       year: "numeric",
+      weekday: "short",
     });
   };
 
@@ -53,62 +55,108 @@ export function TripCard({ trip }: TripCardProps) {
   const availableSeats = totalSeats - soldSeats;
   const occupancyPercentage = totalSeats > 0 ? (soldSeats / totalSeats) * 100 : 0;
 
+  // Determinar estado de ocupación (colores sutiles)
+  const isHighOccupancy = occupancyPercentage > 80;
+  const isMediumOccupancy = occupancyPercentage > 50 && occupancyPercentage <= 80;
+
+  const statusColor = isHighOccupancy
+    ? "text-error"
+    : isMediumOccupancy
+    ? "text-warning"
+    : "text-success";
+
+  const statusBg = isHighOccupancy
+    ? "bg-error"
+    : isMediumOccupancy
+    ? "bg-warning"
+    : "bg-success";
+
   return (
-    <Card className="hover:shadow-lg transition-shadow">
-      <CardHeader>
-        <div className="flex items-start justify-between">
+    <Card className="relative h-full flex flex-col overflow-hidden border-border bg-background transition-all duration-200 hover:border-primary/30 hover:shadow-md">
+      <CardHeader className="pb-3">
+        <div className="flex justify-between items-start">
           <div className="space-y-1">
-            <CardTitle className="text-xl">Viaje {trip.horaSalida}</CardTitle>
-            <CardDescription className="flex items-center gap-2 mt-2">
-              <Calendar className="h-4 w-4" />
+            <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground uppercase tracking-wide">
+              <Calendar className="w-4 h-4" />
               {formatDate(trip.fechaSalida)}
-            </CardDescription>
+            </div>
+            <CardTitle className="text-2xl font-bold flex items-center gap-2 text-foreground">
+              <Clock className="w-5 h-5 text-primary" />
+              {trip.horaSalida}
+            </CardTitle>
           </div>
-          <div
-            className={`px-3 py-1 rounded-full text-xs font-medium ${
+
+          <span
+            className={cn(
+              "px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider border",
               trip.estado === "programado"
-                ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
-                : "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200"
-            }`}
+                ? "text-success border-success/30 bg-success/10"
+                : "text-muted-foreground border-border bg-muted"
+            )}
           >
-            {trip.estado === "programado" ? "Programado" : trip.estado}
-          </div>
+            {trip.estado}
+          </span>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4">
+
+      <CardContent className="flex-1 flex flex-col gap-4">
+        {/* Información de embarcación */}
         {vessel && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Ship className="h-4 w-4" />
-            <span>{vessel.nombre}</span>
+          <div className="flex items-center gap-3 p-3 rounded-lg border border-border bg-muted/30">
+            <div className="p-2 bg-background rounded-md border border-border">
+              <Ship className="w-4 h-4 text-primary" />
+            </div>
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-medium uppercase">
+                Embarcación
+              </span>
+              <span className="font-semibold text-foreground">{vessel.nombre}</span>
+            </div>
           </div>
         )}
 
-        {/* Indicador de ocupación */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Ocupación</span>
-            <span className="font-medium">
-              {soldSeats}/{totalSeats} asientos
+        {/* Estadísticas de ocupación */}
+        <div className="space-y-3 mt-auto">
+          <div className="flex justify-between items-end">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">
+                Disponibilidad
+              </span>
+              <div className="flex items-baseline gap-1">
+                <span className={cn("text-2xl font-bold", statusColor)}>
+                  {availableSeats}
+                </span>
+                <span className="text-sm text-muted-foreground">/ {totalSeats}</span>
+              </div>
+            </div>
+            <span
+              className={cn(
+                "text-xs font-semibold px-2 py-1 rounded-md",
+                isHighOccupancy && "bg-error/10 text-error",
+                isMediumOccupancy && "bg-warning/10 text-warning",
+                !isHighOccupancy && !isMediumOccupancy && "bg-success/10 text-success"
+              )}
+            >
+              {Math.round(occupancyPercentage)}% Ocupado
             </span>
           </div>
-          <div className="w-full bg-secondary rounded-full h-2">
+
+          {/* Barra de progreso limpia */}
+          <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
             <div
-              className="bg-primary h-2 rounded-full transition-all"
+              className={cn("h-full transition-all duration-300 ease-out", statusBg)}
               style={{ width: `${occupancyPercentage}%` }}
             />
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{availableSeats} disponibles</span>
-            <span>{Math.round(occupancyPercentage)}% ocupado</span>
-          </div>
         </div>
 
+        {/* Botón de acción */}
         <Button
-          className="w-full"
           onClick={() => router.push(`/ventas/${trip.id}`)}
+          className="w-full mt-4 group"
         >
-          Gestionar Ventas
-          <ArrowRight className="ml-2 h-4 w-4" />
+          Abrir Ventanilla
+          <ArrowRight className="ml-2 w-4 h-4 transition-transform group-hover:translate-x-1" />
         </Button>
       </CardContent>
     </Card>

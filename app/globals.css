@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
 :root {
-  --background: 0 0% 100%;
-  --foreground: 0 0% 3.9%;
+  /* Paleta Sobria y Profesional - Transporte Fluvial Amazónico */
+
+  /* Base neutra */
+  --background: 0 0% 100%; /* Blanco puro */
+  --foreground: 220 10% 15%; /* Gris carbón (texto principal) */
+
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 3.9%;
+  --card-foreground: 220 10% 15%;
+
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 3.9%;
-  --primary: 0 0% 9%;
-  --primary-foreground: 0 0% 98%;
-  --secondary: 0 0% 96.1%;
-  --secondary-foreground: 0 0% 9%;
-  --muted: 0 0% 96.1%;
-  --muted-foreground: 0 0% 45.1%;
-  --accent: 0 0% 96.1%;
-  --accent-foreground: 0 0% 9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 0 0% 98%;
-  --border: 0 0% 89.8%;
-  --input: 0 0% 89.8%;
-  --ring: 0 0% 3.9%;
-  --radius: 0.5rem;
+  --popover-foreground: 220 10% 15%;
+
+  /* Primario: Azul río (azul amazonas suave) */
+  --primary: 205 65% 35%; /* #2c6b8e - Azul río amazonas */
+  --primary-foreground: 0 0% 100%;
+
+  /* Secundario: Arena/Tierra */
+  --secondary: 30 20% 90%; /* Beige muy claro */
+  --secondary-foreground: 25 30% 25%; /* Marrón tierra */
+
+  /* Neutros */
+  --muted: 220 15% 96%; /* Gris muy claro */
+  --muted-foreground: 220 10% 45%; /* Gris medio */
+
+  /* Acento: Verde selva (en lugar de oro vibrante) */
+  --accent: 160 50% 40%; /* Verde amazónico */
+  --accent-foreground: 0 0% 100%;
+
+  /* Estados */
+  --success: 145 65% 45%; /* Verde éxito */
+  --warning: 40 85% 55%; /* Amarillo/naranja suave */
+  --error: 0 70% 50%; /* Rojo error */
+  --info: 205 85% 60%; /* Azul info */
+
+  --destructive: 0 70% 50%;
+  --destructive-foreground: 0 0% 100%;
+
+  --border: 220 15% 88%; /* Borde sutil */
+  --input: 220 15% 88%;
+  --ring: 205 65% 35%; /* Focus ring (azul río) */
+
+  --radius: 0.75rem;
+
+  /* Colores especiales para métodos de pago */
+  --payment-cash: 145 65% 45%; /* Verde efectivo */
+  --payment-yape: 270 70% 60%; /* Púrpura YAPE */
+  --payment-plin: 190 85% 50%; /* Cian PLIN */
 }
 
 @theme inline {
@@ -43,31 +70,67 @@
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
+
+  /* Colores de pago */
+  --color-payment-cash: hsl(var(--payment-cash));
+  --color-payment-yape: hsl(var(--payment-yape));
+  --color-payment-plin: hsl(var(--payment-plin));
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from { height: 0 }
+    to { height: var(--radix-accordion-content-height) }
+  }
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height) }
+    to { height: 0 }
+  }
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    /* Dark Mode - Sobrio y funcional */
+    --background: 220 15% 8%; /* Casi negro con tinte azul */
+    --foreground: 220 10% 95%; /* Blanco suave */
+
+    --card: 220 15% 10%;
+    --card-foreground: 220 10% 95%;
+
+    --popover: 220 15% 10%;
+    --popover-foreground: 220 10% 95%;
+
+    --primary: 205 80% 50%; /* Azul río más brillante para dark */
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 220 15% 15%; /* Gris carbón */
+    --secondary-foreground: 220 10% 95%;
+
+    --muted: 220 15% 12%; /* Gris oscuro */
+    --muted-foreground: 220 10% 60%;
+
+    --accent: 160 60% 45%; /* Verde selva más brillante */
+    --accent-foreground: 0 0% 100%;
+
+    --success: 145 70% 50%;
+    --warning: 40 90% 60%;
+    --error: 0 75% 55%;
+    --info: 205 90% 65%;
+
+    --destructive: 0 75% 55%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 15% 20%; /* Borde oscuro */
+    --input: 220 15% 20%;
+    --ring: 205 80% 50%;
   }
 }
 
@@ -75,4 +138,13 @@ body {
   background: hsl(var(--background));
   color: hsl(var(--foreground));
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+/* Utility: Background grid sutil para mapa de asientos */
+.seat-grid-bg {
+  background-image:
+    linear-gradient(rgba(200, 200, 200, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(200, 200, 200, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
 }

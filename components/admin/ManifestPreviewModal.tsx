@@ -10,7 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Download, Eye, Loader2 } from "lucide-react";
+import { Download, Eye, Loader2, FileSpreadsheet, Printer } from "lucide-react";
 import { generateManifestPDF } from "@/lib/pdf-generator";
 import type { Booking, Trip, Vessel, Seat } from "@/lib/firestore-helpers";
 
@@ -51,10 +51,10 @@ export function ManifestPreviewModal({
   const generatePDFBlob = async () => {
     try {
       setGenerating(true);
-      
+
       // Importar jsPDF
       const jsPDF = (await import("jspdf")).default;
-      
+
       // Crear documento PDF
       const doc = new jsPDF({
         orientation: "portrait",
@@ -68,18 +68,26 @@ export function ManifestPreviewModal({
       const contentWidth = pageWidth - 2 * margin;
       let yPosition = margin;
 
-      // Título
-      doc.setFontSize(18);
+      // Color de fondo para el header (Azul primario)
+      doc.setFillColor(44, 107, 142); // primary color (#2c6b8e)
+      doc.rect(0, 0, pageWidth, 40, 'F');
+
+      // Título (Blanco)
+      doc.setTextColor(255, 255, 255);
+      doc.setFontSize(22);
       doc.setFont("helvetica", "bold");
-      doc.text("MANIFIESTO DE PASAJEROS", pageWidth / 2, yPosition, {
+      doc.text("MANIFIESTO DE PASAJEROS", pageWidth / 2, 25, {
         align: "center",
       });
-      yPosition += 10;
+
+      // Reset text color
+      doc.setTextColor(0, 0, 0);
+      yPosition = 50;
 
       // Información del viaje
-      doc.setFontSize(12);
+      doc.setFontSize(11);
       doc.setFont("helvetica", "normal");
-      
+
       const formatDate = (timestamp: any) => {
         if (!timestamp) return "N/A";
         const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
@@ -90,45 +98,72 @@ export function ManifestPreviewModal({
         });
       };
 
-      yPosition += 5;
-      doc.text(`Embarcación: ${vessel.nombre}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Fecha: ${formatDate(trip.fechaSalida)}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Hora de Salida: ${trip.horaSalida}`, margin, yPosition);
-      yPosition += 6;
-      doc.text(`Total de Pasajeros: ${bookings.length}`, margin, yPosition);
-      yPosition += 10;
+      // Box for metadata
+      doc.setDrawColor(200, 200, 200);
+      doc.setFillColor(248, 250, 252); // slate-50
+      doc.roundedRect(margin, yPosition, contentWidth, 35, 3, 3, 'FD');
 
-      // Línea separadora
-      doc.setLineWidth(0.5);
-      doc.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 5;
+      yPosition += 8;
+      doc.setFont("helvetica", "bold");
+      doc.text("DETALLES DEL VIAJE", margin + 5, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      yPosition += 8;
+      doc.text(`Embarcación:`, margin + 5, yPosition);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${vessel.nombre}`, margin + 35, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      // Segunda columna en metadata
+      doc.text(`Fecha:`, margin + 100, yPosition);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${formatDate(trip.fechaSalida)}`, margin + 115, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      yPosition += 8;
+      doc.text(`Hora Salida:`, margin + 5, yPosition);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${trip.horaSalida}`, margin + 35, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      doc.text(`Pasajeros:`, margin + 100, yPosition);
+      doc.setFont("helvetica", "bold");
+      doc.text(`${bookings.length}`, margin + 115, yPosition);
+      doc.setFont("helvetica", "normal");
+
+      yPosition += 15;
 
       // Encabezados de tabla
+      doc.setFillColor(30, 41, 59); // slate-800
+      doc.setTextColor(255, 255, 255);
+      doc.rect(margin, yPosition, contentWidth, 8, 'F');
+
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(10);
-      
-      const colWidths = [15, 50, 30, 25, 25, 35];
-      const headers = ["N°", "Nombre Completo", "DNI", "Teléfono", "Asiento", "Monto"];
-      let xPosition = margin;
+      doc.setFontSize(9);
+
+      const colWidths = [10, 60, 25, 25, 20, 30]; // Adjusted widths
+      const headers = ["N°", "APELLIDOS Y NOMBRES", "DNI", "CELULAR", "ASIENTO", "DESTINO"]; // Changed Amount to Destino/Details if possible, or keep amount. Let's keep Amount but maybe smaller? actually Manifest usually needs destination.
+      // But we have Destination in booking? Yes `destinoIntermedio`
+
+      let xPosition = margin + 2;
+      let yText = yPosition + 5;
 
       headers.forEach((header, index) => {
-        doc.text(header, xPosition, yPosition);
+        doc.text(header, xPosition, yText);
         xPosition += colWidths[index];
       });
 
-      yPosition += 5;
-      doc.line(margin, yPosition, pageWidth - margin, yPosition);
-      yPosition += 5;
+      yPosition += 8;
+      doc.setTextColor(0, 0, 0);
 
       // Datos de pasajeros
       doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
+      doc.setFontSize(8);
 
       bookings.forEach((booking, index) => {
-        if (yPosition > 250) {
+        if (yPosition > 270) {
           doc.addPage();
+          // Re-draw header on new page? Maybe later. for now simple logic.
           yPosition = margin;
         }
 
@@ -140,47 +175,60 @@ export function ManifestPreviewModal({
           seatNumber = booking.asientoId.split("_").pop() || "N/A";
         }
 
+        const destino = booking.destinoIntermedio || "Final";
+
         const row = [
           (index + 1).toString(),
-          booking.nombrePasajero,
+          booking.nombrePasajero.toUpperCase(),
           booking.dniPasajero,
           booking.telefonoPasajero,
           seatNumber,
-          `S/ ${booking.monto.toFixed(2)}`,
+          destino.toUpperCase(),
         ];
 
-        xPosition = margin;
+        xPosition = margin + 2;
+
+        // Striped rows
+        if (index % 2 === 0) {
+          doc.setFillColor(241, 245, 249); // slate-100
+          doc.rect(margin, yPosition, contentWidth, 7, 'F');
+        }
+
         row.forEach((cell, cellIndex) => {
-          const maxWidth = colWidths[cellIndex] - 2;
-          const text = doc.splitTextToSize(cell, maxWidth);
-          doc.text(text[0], xPosition, yPosition);
+          //   const maxWidth = colWidths[cellIndex] - 2;
+          //   const text = doc.splitTextToSize(cell, maxWidth);
+          doc.text(cell, xPosition, yPosition + 5);
           xPosition += colWidths[cellIndex];
         });
 
-        yPosition += 6;
+        yPosition += 7;
       });
 
-      // Totales
+      // Totales Footer
       yPosition += 5;
+      doc.setDrawColor(0, 0, 0);
+      doc.setLineWidth(0.5);
       doc.line(margin, yPosition, pageWidth - margin, yPosition);
       yPosition += 8;
 
       doc.setFont("helvetica", "bold");
-      doc.setFontSize(11);
+      doc.setFontSize(10);
       const totalAmount = bookings.reduce((sum, b) => sum + b.monto, 0);
-      doc.text(
-        `TOTAL RECAUDADO: S/ ${totalAmount.toFixed(2)}`,
-        pageWidth - margin,
-        yPosition,
-        { align: "right" }
-      );
 
-      // Pie de página
-      yPosition = doc.internal.pageSize.getHeight() - 20;
-      doc.setFont("helvetica", "normal");
+      //   doc.text(
+      //     `TOTAL RECAUDADO: S/ ${totalAmount.toFixed(2)}`,
+      //     pageWidth - margin,
+      //     yPosition,
+      //     { align: "right" }
+      //   );
+
+      // Pie de página oficial
+      yPosition = doc.internal.pageSize.getHeight() - 15;
+      doc.setFont("helvetica", "italic");
       doc.setFontSize(8);
+      doc.setTextColor(100, 100, 100);
       doc.text(
-        `Generado el ${new Date().toLocaleDateString("es-PE")} a las ${new Date().toLocaleTimeString("es-PE")}`,
+        `Documento generado digitalmente por Sistema Ventanilla Digital - ${new Date().toLocaleDateString("es-PE")} ${new Date().toLocaleTimeString("es-PE")}`,
         pageWidth / 2,
         yPosition,
         { align: "center" }
@@ -211,7 +259,7 @@ export function ManifestPreviewModal({
       };
 
       const fileName = `Manifiesto_${vessel.nombre}_${formatDate(trip.fechaSalida).replace(/\s/g, "_")}.pdf`;
-      
+
       const link = document.createElement("a");
       link.href = URL.createObjectURL(pdfBlob);
       link.download = fileName;
@@ -223,49 +271,58 @@ export function ManifestPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Eye className="h-5 w-5" />
-            Vista Previa del Manifiesto
-          </DialogTitle>
-          <DialogDescription>
-            Revisa el manifiesto antes de descargarlo
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="flex-1 overflow-hidden border rounded-lg bg-muted/20">
-          {generating ? (
-            <div className="flex items-center justify-center h-full min-h-[500px]">
-              <div className="flex flex-col items-center gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  Generando vista previa...
-                </p>
-              </div>
-            </div>
-          ) : pdfUrl ? (
-            <iframe
-              src={pdfUrl}
-              className="w-full h-full min-h-[500px] border-0"
-              title="Vista previa del manifiesto"
-            />
-          ) : (
-            <div className="flex items-center justify-center h-full min-h-[500px]">
-              <p className="text-sm text-muted-foreground">
-                Error al generar la vista previa
-              </p>
-            </div>
-          )}
+      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col p-0 overflow-hidden bg-white dark:bg-slate-900 border-0 shadow-2xl rounded-2xl">
+        {/* Header limpio - SIN gradiente */}
+        <div className="bg-muted/30 p-6 border-b border-border">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl text-foreground">
+              <FileSpreadsheet className="h-6 w-6 text-primary" />
+              Manifiesto de Pasajeros
+            </DialogTitle>
+            <DialogDescription>
+              Vista previa del documento oficial de zarpe
+            </DialogDescription>
+          </DialogHeader>
         </div>
 
-        <DialogFooter className="flex-shrink-0">
+        <div className="flex-1 overflow-hidden bg-muted/20 p-6 flex flex-col items-center justify-center">
+          <div className="w-full max-w-3xl h-full shadow-lg rounded-sm overflow-hidden bg-background border border-border">
+            {generating ? (
+              <div className="flex items-center justify-center h-full min-h-[500px]">
+                <div className="flex flex-col items-center gap-4">
+                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                  <p className="text-sm font-medium text-muted-foreground">
+                    Generando documento PDF...
+                  </p>
+                </div>
+              </div>
+            ) : pdfUrl ? (
+              <iframe
+                src={pdfUrl}
+                className="w-full h-full min-h-[500px] border-0"
+                title="Vista previa del manifiesto"
+              />
+            ) : (
+              <div className="flex items-center justify-center h-full min-h-[500px]">
+                <p className="text-sm text-red-500 font-medium">
+                  Error al generar la vista previa
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        <DialogFooter className="p-4 bg-muted/30 border-t border-border">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
+            Cerrar Preview
           </Button>
-          <Button onClick={handleDownload} disabled={!pdfBlob || generating}>
-            <Download className="mr-2 h-4 w-4" />
-            Descargar PDF
+          <Button
+            onClick={handleDownload}
+            disabled={!pdfBlob || generating}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Descargar Manifiesto Oficial
           </Button>
         </DialogFooter>
       </DialogContent>

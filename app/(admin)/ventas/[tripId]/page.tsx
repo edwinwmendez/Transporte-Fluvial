@@ -60,6 +60,14 @@ export default function VentasPage() {
     setShowSaleModal(false);
   };
 
+  const handleCloseModal = (open: boolean) => {
+    setShowSaleModal(open);
+    // Si se cierra el modal (open = false), resetear el asiento seleccionado
+    if (!open) {
+      setSelectedSeat(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
@@ -152,7 +160,7 @@ export default function VentasPage() {
           rutaId={trip.rutaId}
           seat={selectedSeat}
           open={showSaleModal}
-          onOpenChange={setShowSaleModal}
+          onOpenChange={handleCloseModal}
           onComplete={handleSaleComplete}
         />
       )}
