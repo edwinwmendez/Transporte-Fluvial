@@ -216,10 +216,11 @@ function SeatButton({ seat, state, onClick }: SeatButtonProps) {
           "shadow-md ring-2 ring-primary/20"
         ],
 
-        // VENDIDO - rojo vibrante
+        // VENDIDO - rojo vibrante (ahora clickeable para ver boletos)
         isSold && [
           "bg-red-500 border-red-600 text-white",
-          "cursor-not-allowed opacity-70"
+          "hover:bg-red-600 hover:border-red-700",
+          "hover:shadow-sm cursor-pointer"
         ],
 
         // PARCIAL - ámbar vibrante
@@ -228,7 +229,7 @@ function SeatButton({ seat, state, onClick }: SeatButtonProps) {
           "hover:bg-amber-600 hover:border-amber-700"
         ]
       )}
-      disabled={isSold}
+      // disabled={isSold} // Ya no deshabilitamos asientos rojos para poder ver boletos
     >
       {/* Ícono de asiento simplificado */}
       <div className="relative w-8 h-8 sm:w-10 sm:h-10 flex items-center justify-center">

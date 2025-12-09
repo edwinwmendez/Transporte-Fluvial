@@ -12,7 +12,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Download, Eye, Loader2, FileSpreadsheet, Printer } from "lucide-react";
 import { generateManifestPDF } from "@/lib/pdf-generator";
-import type { Booking, Trip, Vessel, Seat } from "@/lib/firestore-helpers";
+import { getRoute } from "@/lib/firestore-helpers";
+import type { Booking, Trip, Vessel, Seat, Route } from "@/lib/firestore-helpers";
 
 interface ManifestPreviewModalProps {
   open: boolean;
@@ -21,6 +22,7 @@ interface ManifestPreviewModalProps {
   vessel: Vessel;
   bookings: Booking[];
   seats: Seat[];
+  route?: Route | null;
 }
 
 export function ManifestPreviewModal({
@@ -30,14 +32,16 @@ export function ManifestPreviewModal({
   vessel,
   bookings,
   seats,
+  route: routeProp,
 }: ManifestPreviewModalProps) {
   const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(true);
+  const [route, setRoute] = useState<Route | null>(null);
 
   useEffect(() => {
     if (open && bookings.length > 0) {
-      generatePDFBlob();
+      loadRoute();
     }
 
     return () => {
@@ -46,7 +50,26 @@ export function ManifestPreviewModal({
         URL.revokeObjectURL(pdfUrl);
       }
     };
-  }, [open, bookings.length]);
+  }, [open, bookings.length, trip.rutaId]);
+
+  useEffect(() => {
+    if (open && bookings.length > 0 && route) {
+      generatePDFBlob();
+    }
+  }, [route]);
+
+  async function loadRoute() {
+    if (routeProp) {
+      setRoute(routeProp);
+    } else if (trip.rutaId) {
+      try {
+        const routeData = await getRoute(trip.rutaId);
+        setRoute(routeData);
+      } catch (error) {
+        console.error("Error al cargar ruta:", error);
+      }
+    }
+  }
 
   const generatePDFBlob = async () => {
     try {
@@ -141,9 +164,8 @@ export function ManifestPreviewModal({
       doc.setFont("helvetica", "bold");
       doc.setFontSize(9);
 
-      const colWidths = [10, 60, 25, 25, 20, 30]; // Adjusted widths
-      const headers = ["N°", "APELLIDOS Y NOMBRES", "DNI", "CELULAR", "ASIENTO", "DESTINO"]; // Changed Amount to Destino/Details if possible, or keep amount. Let's keep Amount but maybe smaller? actually Manifest usually needs destination.
-      // But we have Destination in booking? Yes `destinoIntermedio`
+      const colWidths = [8, 45, 20, 20, 15, 25, 25, 25]; // Adjusted widths
+      const headers = ["N°", "APELLIDOS Y NOMBRES", "DNI", "CELULAR", "ASIENTO", "ORIGEN", "DESTINO", "MONTO"];
 
       let xPosition = margin + 2;
       let yText = yPosition + 5;
@@ -175,7 +197,9 @@ export function ManifestPreviewModal({
           seatNumber = booking.asientoId.split("_").pop() || "N/A";
         }
 
-        const destino = booking.destinoIntermedio || "Final";
+        const origen = booking.origenIntermedio || route?.origen || "N/A";
+        const destino = booking.destinoIntermedio || route?.destino || "Final";
+        const monto = booking.pago?.monto || 0;
 
         const row = [
           (index + 1).toString(),
@@ -183,7 +207,9 @@ export function ManifestPreviewModal({
           booking.dniPasajero,
           booking.telefonoPasajero,
           seatNumber,
+          origen.toUpperCase(),
           destino.toUpperCase(),
+          `S/ ${monto.toFixed(2)}`,
         ];
 
         xPosition = margin + 2;
@@ -213,7 +239,7 @@ export function ManifestPreviewModal({
 
       doc.setFont("helvetica", "bold");
       doc.setFontSize(10);
-      const totalAmount = bookings.reduce((sum, b) => sum + b.monto, 0);
+      const totalAmount = bookings.reduce((sum, b) => sum + (b.pago?.monto || 0), 0);
 
       //   doc.text(
       //     `TOTAL RECAUDADO: S/ ${totalAmount.toFixed(2)}`,

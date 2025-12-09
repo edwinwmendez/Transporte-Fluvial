@@ -26,17 +26,17 @@ export function CashSummaryCard({ tripId }: CashSummaryCardProps) {
   }, [tripId]);
 
   // Calcular totales
-  const total = bookings.reduce((sum, booking) => sum + booking.monto, 0);
+  const total = bookings.reduce((sum, booking) => sum + (booking.pago?.monto || 0), 0);
   const byMethod = {
     efectivo: bookings
-      .filter((b) => b.metodoPago === "efectivo")
-      .reduce((sum, b) => sum + b.monto, 0),
+      .filter((b) => b.pago?.metodoPago === "efectivo")
+      .reduce((sum, b) => sum + (b.pago?.monto || 0), 0),
     yape: bookings
-      .filter((b) => b.metodoPago === "yape")
-      .reduce((sum, b) => sum + b.monto, 0),
+      .filter((b) => b.pago?.metodoPago === "yape")
+      .reduce((sum, b) => sum + (b.pago?.monto || 0), 0),
     plin: bookings
-      .filter((b) => b.metodoPago === "plin")
-      .reduce((sum, b) => sum + b.monto, 0),
+      .filter((b) => b.pago?.metodoPago === "plin")
+      .reduce((sum, b) => sum + (b.pago?.monto || 0), 0),
   };
 
   const manualAmount = parseFloat(manualCount || "0");

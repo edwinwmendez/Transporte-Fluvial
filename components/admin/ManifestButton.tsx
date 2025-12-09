@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FileText, Eye, Loader2, FileSpreadsheet } from "lucide-react";
-import { getTrip, getVessel, getBookingsForTrip, getSeatsForTrip } from "@/lib/firestore-helpers";
+import { getTrip, getVessel, getBookingsForTrip, getSeatsForTrip, getRoute } from "@/lib/firestore-helpers";
 import { ManifestPreviewModal } from "./ManifestPreviewModal";
-import type { Trip, Vessel, Booking, Seat } from "@/lib/firestore-helpers";
+import type { Trip, Vessel, Booking, Seat, Route } from "@/lib/firestore-helpers";
 
 interface ManifestButtonProps {
   tripId: string;
@@ -20,6 +20,7 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
     vessel: Vessel;
     bookings: Booking[];
     seats: Seat[];
+    route: Route | null;
   } | null>(null);
 
   const handlePreviewManifest = async () => {
@@ -43,13 +44,15 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
         throw new Error("Embarcación no encontrada");
       }
 
+      const route = trip.rutaId ? await getRoute(trip.rutaId) : null;
+
       if (bookings.length === 0) {
         setError("No hay reservas para este viaje");
         return;
       }
 
       // Guardar datos y mostrar preview
-      setManifestData({ trip, vessel, bookings, seats });
+      setManifestData({ trip, vessel, bookings, seats, route });
       setShowPreview(true);
     } catch (err: any) {
       console.error("Error al cargar datos del manifiesto:", err);
@@ -93,6 +96,7 @@ export function ManifestButton({ tripId }: ManifestButtonProps) {
           vessel={manifestData.vessel}
           bookings={manifestData.bookings}
           seats={manifestData.seats}
+          route={manifestData.route}
         />
       )}
     </>

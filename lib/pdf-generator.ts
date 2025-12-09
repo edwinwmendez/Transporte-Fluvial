@@ -1,15 +1,23 @@
 import jsPDF from "jspdf";
-import type { Booking, Trip, Vessel, Seat } from "./firestore-helpers";
+import type { Booking, Trip, Vessel, Seat, Route } from "./firestore-helpers";
+import { getRoute } from "./firestore-helpers";
 
 interface ManifestData {
   trip: Trip;
   vessel: Vessel;
   bookings: Booking[];
   seats?: Seat[]; // Opcional: si se proporciona, se usa para obtener seatNumber
+  route?: Route; // Opcional: ruta para obtener origen/destino
 }
 
-export function generateManifestPDF(data: ManifestData): Blob {
-  const { trip, vessel, bookings, seats } = data;
+export async function generateManifestPDF(data: ManifestData): Promise<Blob> {
+  const { trip, vessel, bookings, seats, route } = data;
+  
+  // Obtener ruta si no se proporcionó
+  let routeData: Route | null = route || null;
+  if (!routeData && trip.rutaId) {
+    routeData = await getRoute(trip.rutaId);
+  }
 
   // Crear documento PDF
   const doc = new jsPDF({
@@ -65,8 +73,8 @@ export function generateManifestPDF(data: ManifestData): Blob {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
   
-  const colWidths = [15, 50, 30, 25, 25, 35]; // Nro, Nombre, DNI, Teléfono, Asiento, Monto
-  const headers = ["N°", "Nombre Completo", "DNI", "Teléfono", "Asiento", "Monto"];
+  const colWidths = [10, 40, 20, 20, 15, 25, 25, 25]; // Nro, Nombre, DNI, Teléfono, Asiento, Origen, Destino, Monto
+  const headers = ["N°", "Nombre Completo", "DNI", "Teléfono", "Asiento", "Origen", "Destino", "Monto"];
   let xPosition = margin;
 
   headers.forEach((header, index) => {
@@ -99,13 +107,18 @@ export function generateManifestPDF(data: ManifestData): Blob {
       seatNumber = booking.asientoId.split("_").pop() || "N/A";
     }
 
+    const origen = booking.origenIntermedio || (routeData ? routeData.origen : "N/A");
+    const destino = booking.destinoIntermedio || (routeData ? routeData.destino : "N/A");
+
     const row = [
       (index + 1).toString(),
       booking.nombrePasajero,
       booking.dniPasajero,
       booking.telefonoPasajero,
       seatNumber,
-      `S/ ${booking.monto.toFixed(2)}`,
+      origen,
+      destino,
+      `S/ ${(booking.pago?.monto || 0).toFixed(2)}`,
     ];
 
     xPosition = margin;
@@ -127,7 +140,7 @@ export function generateManifestPDF(data: ManifestData): Blob {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(11);
-  const totalAmount = bookings.reduce((sum, b) => sum + b.monto, 0);
+  const totalAmount = bookings.reduce((sum, b) => sum + (b.pago?.monto || 0), 0);
   doc.text(
     `TOTAL RECAUDADO: S/ ${totalAmount.toFixed(2)}`,
     pageWidth - margin,

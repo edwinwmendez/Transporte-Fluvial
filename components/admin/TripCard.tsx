@@ -6,8 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Calendar, Clock, Ship, ArrowRight } from "lucide-react";
 import type { Trip } from "@/lib/firestore-helpers";
 import { useEffect, useState } from "react";
-import { getVessel, getSeatsForTrip } from "@/lib/firestore-helpers";
-import type { Vessel, Seat } from "@/lib/firestore-helpers";
+import { getVessel, getSeatsForTrip, getBookingsForTrip } from "@/lib/firestore-helpers";
+import type { Vessel, Seat, Booking } from "@/lib/firestore-helpers";
 import { cn } from "@/lib/utils";
 
 interface TripCardProps {
@@ -18,17 +18,20 @@ export function TripCard({ trip }: TripCardProps) {
   const router = useRouter();
   const [vessel, setVessel] = useState<Vessel | null>(null);
   const [seats, setSeats] = useState<Seat[]>([]);
+  const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadTripData() {
       try {
-        const [vesselData, seatsData] = await Promise.all([
+        const [vesselData, seatsData, bookingsData] = await Promise.all([
           getVessel(trip.embarcacionId),
           getSeatsForTrip(trip.id),
+          getBookingsForTrip(trip.id),
         ]);
         setVessel(vesselData);
         setSeats(seatsData);
+        setBookings(bookingsData);
       } catch (error) {
         console.error("Error al cargar datos del viaje:", error);
       } finally {
@@ -50,10 +53,12 @@ export function TripCard({ trip }: TripCardProps) {
     });
   };
 
-  const soldSeats = seats.filter((s) => s.estado === "vendido").length;
+  // Contar asientos únicos ocupados (no reservas, porque un asiento puede tener múltiples reservas en diferentes tramos)
+  const confirmedBookings = bookings.filter((b) => b.estado === "confirmado");
+  const uniqueOccupiedSeats = new Set(confirmedBookings.map((b) => b.asientoId)).size;
   const totalSeats = seats.length || vessel?.capacidad || 0;
-  const availableSeats = totalSeats - soldSeats;
-  const occupancyPercentage = totalSeats > 0 ? (soldSeats / totalSeats) * 100 : 0;
+  const availableSeats = totalSeats - uniqueOccupiedSeats;
+  const occupancyPercentage = totalSeats > 0 ? (uniqueOccupiedSeats / totalSeats) * 100 : 0;
 
   // Determinar estado de ocupación (colores sutiles)
   const isHighOccupancy = occupancyPercentage > 80;

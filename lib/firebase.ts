@@ -1,6 +1,7 @@
 import { initializeApp, getApps, FirebaseApp } from 'firebase/app';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getAuth, Auth } from 'firebase/auth';
+import { getStorage, FirebaseStorage } from 'firebase/storage';
 
 // Configuración de Firebase desde variables de entorno
 const firebaseConfig = {
@@ -23,4 +24,5 @@ if (getApps().length === 0) {
 // Exportar servicios
 export const db: Firestore = getFirestore(app);
 export const auth: Auth = getAuth(app);
+export const storage: FirebaseStorage = getStorage(app);
 export default app;

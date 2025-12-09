@@ -6,11 +6,14 @@ import { getTrip, getVessel } from "@/lib/firestore-helpers";
 import type { Trip, Vessel } from "@/lib/firestore-helpers";
 import { SeatMap } from "@/components/admin/SeatMap";
 import { QuickSaleModal } from "@/components/admin/QuickSaleModal";
+import { SeatOptionsModal } from "@/components/admin/SeatOptionsModal";
 import { CashSummaryCard } from "@/components/admin/CashSummaryCard";
 import { ManifestButton } from "@/components/admin/ManifestButton";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { getBookingsForSeat, getRoute, estaAsientoCompletamenteOcupado } from "@/lib/firestore-helpers";
+import type { Seat, Route, Booking } from "@/lib/firestore-helpers";
 
 export default function VentasPage() {
   const params = useParams();
@@ -20,8 +23,12 @@ export default function VentasPage() {
   const [trip, setTrip] = useState<Trip | null>(null);
   const [vessel, setVessel] = useState<Vessel | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSeat, setSelectedSeat] = useState<any>(null);
+  const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [showSaleModal, setShowSaleModal] = useState(false);
+  const [showSeatOptionsModal, setShowSeatOptionsModal] = useState(false);
+  const [selectedSeatState, setSelectedSeatState] = useState<'available' | 'partial' | 'sold'>('available');
+  const [cachedRoute, setCachedRoute] = useState<Route | null>(null);
+  const [cachedBookings, setCachedBookings] = useState<Booking[]>([]);
 
   useEffect(() => {
     async function loadTripData() {
@@ -48,11 +55,53 @@ export default function VentasPage() {
     }
   }, [tripId]);
 
-  const handleSeatClick = (seat: any) => {
-    // Permitir hacer clic en todos los asientos
-    // La verificación de conflictos de tramos se hace al crear la reserva
+  const handleSeatClick = async (seat: Seat) => {
+    if (!trip) return;
+
     setSelectedSeat(seat);
-    setShowSaleModal(true);
+
+    // OPTIMIZACIÓN: Obtener ruta y bookings en paralelo
+    const [bookings, ruta] = await Promise.all([
+      getBookingsForSeat(trip.id, seat.id),
+      // Usar ruta en caché si está disponible (mismo viaje = misma ruta)
+      cachedRoute && cachedRoute.id === trip.rutaId 
+        ? Promise.resolve(cachedRoute)
+        : getRoute(trip.rutaId).then(route => {
+            if (route) setCachedRoute(route);
+            return route;
+          }),
+    ]);
+
+    if (!ruta) {
+      // Si no hay ruta, tratar como disponible
+      setSelectedSeatState('available');
+      setCachedBookings([]);
+      setShowSaleModal(true);
+      return;
+    }
+
+    // Guardar en caché para el modal
+    setCachedBookings(bookings);
+
+    // Determinar estado del asiento
+    if (bookings.length === 0) {
+      // Disponible - abrir modal de venta
+      setSelectedSeatState('available');
+      setShowSaleModal(true);
+    } else {
+      // Verificar si está completamente ocupado
+      const completamenteOcupado = estaAsientoCompletamenteOcupado(bookings, ruta);
+      
+      if (completamenteOcupado) {
+        // Rojo - completamente ocupado - abrir modal de opciones para ver boletos
+        setSelectedSeatState('sold');
+        setShowSeatOptionsModal(true);
+      } else {
+        // Naranja - parcialmente ocupado - abrir modal de opciones (ver boletos o agregar)
+        setSelectedSeatState('partial');
+        setShowSeatOptionsModal(true);
+      }
+    }
   };
 
   const handleSaleComplete = () => {
@@ -131,7 +180,7 @@ export default function VentasPage() {
             <CardHeader className="pb-4">
               <CardTitle className="text-2xl">Mapa de Asientos</CardTitle>
               <CardDescription className="text-base">
-                Haz clic en un asiento disponible para registrar una venta
+                Haz clic en un asiento: Verde para nueva venta, Naranja para ver boletos o agregar pasajero, Rojo para ver boletos
               </CardDescription>
             </CardHeader>
             <CardContent className="pt-0">
@@ -153,8 +202,8 @@ export default function VentasPage() {
         </div>
       </div>
 
-      {/* Modal de Venta Rápida */}
-      {showSaleModal && selectedSeat && trip && (
+      {/* Modal de Venta Rápida (solo para asientos disponibles) */}
+      {showSaleModal && selectedSeat && trip && selectedSeatState === 'available' && (
         <QuickSaleModal
           tripId={tripId}
           rutaId={trip.rutaId}
@@ -162,6 +211,24 @@ export default function VentasPage() {
           open={showSaleModal}
           onOpenChange={handleCloseModal}
           onComplete={handleSaleComplete}
+          rutaPrecargada={cachedRoute || undefined}
+          bookingsPrecargados={cachedBookings}
+        />
+      )}
+
+      {/* Modal de Opciones de Asiento (para asientos rojos y naranjas) */}
+      {showSeatOptionsModal && selectedSeat && trip && (
+        <SeatOptionsModal
+          open={showSeatOptionsModal}
+          onOpenChange={(open) => {
+            setShowSeatOptionsModal(open);
+            if (!open) {
+              setSelectedSeat(null);
+            }
+          }}
+          tripId={tripId}
+          seat={selectedSeat}
+          isCompletelyOccupied={selectedSeatState === 'sold'}
         />
       )}
     </div>

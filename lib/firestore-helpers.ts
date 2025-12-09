@@ -14,6 +14,7 @@ import {
   DocumentData,
   orderBy,
   limit,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -76,6 +77,30 @@ export interface Seat {
   updatedAt: Timestamp;
 }
 
+// Información de pago con validación
+export interface PagoInfo {
+  metodoPago: 'efectivo' | 'yape' | 'plin';
+  monto: number;
+  estado: 'pendiente' | 'validado' | 'rechazado';
+  screenshotUrl?: string; // URL del screenshot en Storage
+  screenshotPath?: string; // Path del screenshot en Storage
+  validadoPor?: string; // userId del admin que validó
+  validadoEn?: Timestamp;
+  razonRechazo?: string;
+}
+
+// Información del boleto digital
+export interface BoletoInfo {
+  numeroTicket: string; // "TKT-20251209-0001"
+  codigoQr: string; // Data URL del QR
+  pdfUrl?: string; // URL del PDF en Storage
+  pdfPath?: string; // Path del PDF en Storage
+  estado: 'emitido' | 'usado' | 'anulado';
+  emitidoEn: Timestamp;
+  usadoEn?: Timestamp;
+  anuladoEn?: Timestamp;
+}
+
 export interface Booking {
   id: string;
   viajeId: string; // Renombrado de 'tripId'
@@ -83,10 +108,12 @@ export interface Booking {
   nombrePasajero: string; // Renombrado de 'passengerName'
   dniPasajero: string; // Renombrado de 'passengerDni'
   telefonoPasajero: string; // Renombrado de 'passengerPhone'
-  destinoIntermedio?: string; // NUEVO: Parada donde se baja (ej: "Sepahua")
-  monto: number; // Renombrado de 'amount'
-  metodoPago: 'efectivo' | 'yape' | 'plin'; // Renombrado de 'paymentMethod'
-  estado: 'confirmado' | 'cancelado'; // Traducido
+  whatsappPasajero?: string; // NUEVO: Número de WhatsApp para envío de boleto
+  origenIntermedio?: string; // ✅ CRÍTICO: Parada donde sube (ej: "Tahuania")
+  destinoIntermedio?: string; // Parada donde se baja (ej: "Sepahua")
+  pago: PagoInfo; // NUEVO: Objeto completo de pago
+  boleto?: BoletoInfo; // NUEVO: Objeto completo de boleto
+  estado: 'confirmado' | 'embarcado' | 'cancelado' | 'no_show'; // Actualizado
   createdAt: Timestamp;
   updatedAt: Timestamp;
 }
@@ -332,14 +359,9 @@ export function estaAsientoCompletamenteOcupado(
   }
 
   // Verificar si las reservas cubren todo el trayecto (desde origen hasta destino final)
-  // Esto requiere verificar que no haya espacios sin cubrir
-  // Por simplicidad, si hay una reserva hasta el destino final, está completamente ocupado
-  // O si hay múltiples reservas que juntas cubren todo el trayecto
-
-  // Verificar si hay una combinación de reservas que cubra desde origen hasta destino final
   const ordenOrigen = orden.get(ruta.origen) ?? 0;
 
-  // Si el punto más avanzado es el destino final, está completamente ocupado
+  // Si el punto más avanzado alcanzado es el destino final, está completamente ocupado
   let maxOrdenAlcanzado = ordenOrigen;
   for (const reserva of reservas) {
     const destinoReserva = reserva.destinoIntermedio || ruta.destino;
@@ -458,67 +480,9 @@ export async function verificarDisponibilidadTramo(
 
     // Verificar conflictos con cada reserva existente
     for (const reserva of reservasExistentes) {
-      const origenExistente = ruta.origen;
-      // TODO: Las reservas existentes también deberían tener su propio origen guardado si no empezaron en ruta.origen
-      // Por ahora asumimos que todas vienen desde ruta.origen O que el sistema ya guardó el tramo ocupado correctamente?
-      // Realmente, la reserva debería guardar 'origen' y 'destino'. 
-      // Actualmente Booking solo guarda 'destinoIntermedio'. 
-      // Asumimos conservadoramente que las reservas existentes ocupan desde [?????] hasta destinoIntermedio.
-      // CRITICAL: SI NO GUARDAMOS EL ORIGEN DE LA RESERVA, ASUMIMOS QUE EMPIEZAN EN RUTA.ORIGEN?
-      // ESO BLOQUEARÍA TRAMOS ANTERIORES LIBRES.
-      // PERO: Si la reserva existente se hizo correctamente, ocupó un tramo.
-      // Sin campo 'origen' en Booking, no podemos saber dónde empezó la reserva existente.
-      // FIX TEMPORAL / SUPOSICIÓN: Las reservas existentes ocupan el tramo que ocupan. 
-      // Si no tenemos campo origen, tenemos un problema de diseño en el modelo de datos.
-
-      // REVISIÓN DEL MODELO: Booking tiene: destinoIntermedio. NO TIENE origenIntermedio.
-      // Si yo viajo B->C, la reserva dice destino:C. Pero no dice origen:B.
-      // Si luego quiero vender A->B, ¿cómo sé que B->C no empezó en A?
-      // Si empezó en A, A->B está ocupado. Si empezó en B, A->B está libre.
-
-      // SOLUCIÓN: Necesitamos agregar `origenBooking` al modelo Booking.
-      // Si no lo hacemos, no podemos soportar bookings de tramos intermedios de forma robusta.
-      // El usuario dijo "el asiento estaba considerado una ruta de Atalaya - Tahuania". 
-      // Eso implica que el sistema "sabe" el tramo.
-      // Pero viendo la interfaz Booking:
-      /*
-      export interface Booking {
-        ...
-        destinoIntermedio?: string;
-        ...
-      }
-      */
-      // No hay origen.
-      // Sin embargo, para no romper todo el esquema de datos ahora mismo (User rule: "not change data model... unless absolutely necessary"),
-      // vamos a asumir que si hay un conflicto, hay un conflicto.
-      // Pero espera, para `verificarConflictoTramos` necesitamos `origenExistente`.
-      // Si usamos `ruta.origen` siempre para reservas existentes, estamos asumiendo que SIEMPRE empiezan al inicio.
-      // Esto significa que si alguien compra B->C, el sistema pensará que compró A->C.
-      // Y bloqueará A->B.
-      // Esto es un bug de diseño fundamental si queremos "saltos".
-      // PERO, para arreglar el bug del usuario (vender el tramo SIGUIENTE), 
-      // Si el usuario tiene A->B. Quiere vender B->C.
-      // Nuevo: B->C. Existente: A->B.
-      // Solapamiento? 
-      // A->B (0-1). B->C (1-2). NO solapan.
-      // ESTO SÍ FUNCIONA incluso si asumimos que el existente empieza en A.
-
-      // EL PROBLEMA REAL DEL USUARIO FUE:
-      // "El asiento está ocupado desde Atalaya hasta Tahuania".
-      // Significa conflicto detectado.
-      // Si el usuario intentó vender B->C, y el sistema usó A->C (porque forzó origen A),
-      // Nuevo (imaginado por sistema): A->C (0-2).
-      // Existente: A->B (0-1).
-      // Solapan? SÍ. (0-2 contiene a 0-1, o interceptan).
-
-      // POR LO TANTO: Solo permitiendo definir el origen NUEVO arreglamos el caso de "vender el siguiente tramo".
-      // El caso inverso ("vender el tramo anterior a uno existente") SÍ requiere cambio de modelo, 
-      // pero para "vender el siguiente" (que es lo común, ir llenando el bote), basta con corregir el input actual.
-
+      // Usar origenIntermedio si existe, sino asumir que empieza en ruta.origen (backward compatibility)
+      const origenExistente = reserva.origenIntermedio || ruta.origen;
       const destinoExistente = reserva.destinoIntermedio || ruta.destino;
-      // Asumimos origenExistente = ruta.origen para bookings viejos, o idealmente leeríamos reserva.origen (si existiera).
-      // Dado que no podemos cambiar la BD fácilmente ahora, mantenemos esta asunción que es "segura" (consevadora, bloquea más de lo necesario pero no permite overbooking).
-      // const origenExistente = ruta.origen; // REMOVED DUPLICATE
 
       if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
         return {
@@ -543,10 +507,13 @@ export async function createBooking(
     nombre: string;
     dni: string;
     telefono: string;
+    whatsapp?: string; // NUEVO: Número de WhatsApp
     destinoIntermedio?: string; // Parada donde se baja
     monto: number;
     metodoPago: 'efectivo' | 'yape' | 'plin';
     origenIntermedio?: string; // NUEVO: Parada donde sube
+    screenshotUrl?: string; // NUEVO: URL del screenshot de pago
+    screenshotPath?: string; // NUEVO: Path del screenshot en Storage
   },
   ruta: Route
 ): Promise<string> {
@@ -574,7 +541,8 @@ export async function createBooking(
     const destinoNuevo = destinoSeleccionado;
 
     for (const reserva of reservasExistentes) {
-      const origenExistente = ruta.origen; // Ver nota arriba sobre limitación del modelo
+      // Usar origenIntermedio si existe, sino asumir que empieza en ruta.origen (backward compatibility)
+      const origenExistente = reserva.origenIntermedio || ruta.origen;
       const destinoExistente = reserva.destinoIntermedio || ruta.destino;
 
       if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
@@ -600,7 +568,8 @@ export async function createBooking(
         }
 
         const reservaData = reservaSnap.data() as Booking;
-        const origenExistente = ruta.origen;
+        // Usar origenIntermedio si existe, sino asumir que empieza en ruta.origen (backward compatibility)
+        const origenExistente = reservaData.origenIntermedio || ruta.origen;
         const destinoExistente = reservaData.destinoIntermedio || ruta.destino;
 
         if (verificarConflictoTramos(ruta, origenNuevo, destinoNuevo, origenExistente, destinoExistente)) {
@@ -612,24 +581,38 @@ export async function createBooking(
       const reservasRef = collection(db, 'reservas');
       const nuevaReservaRef = doc(reservasRef);
 
-      const reservaBase: Omit<Booking, 'id'> = {
+      // Determinar estado del pago: efectivo es validado automáticamente, YAPE/PLIN pendiente
+      const estadoPago: 'pendiente' | 'validado' | 'rechazado' = 
+        datosPasajero.metodoPago === 'efectivo' ? 'validado' : 'pendiente';
+
+      // Crear objeto de pago
+      const pago: PagoInfo = {
+        metodoPago: datosPasajero.metodoPago,
+        monto: datosPasajero.monto,
+        estado: estadoPago,
+        ...(datosPasajero.screenshotUrl && { screenshotUrl: datosPasajero.screenshotUrl }),
+        ...(datosPasajero.screenshotPath && { screenshotPath: datosPasajero.screenshotPath }),
+      };
+
+      // Construir objeto de reserva
+      const reserva: Omit<Booking, 'id'> = {
         viajeId,
         asientoId,
         nombrePasajero: datosPasajero.nombre,
         dniPasajero: datosPasajero.dni,
         telefonoPasajero: datosPasajero.telefono,
-        monto: datosPasajero.monto,
-        metodoPago: datosPasajero.metodoPago,
+        ...(datosPasajero.whatsapp && { whatsappPasajero: datosPasajero.whatsapp }),
+        ...(datosPasajero.origenIntermedio && datosPasajero.origenIntermedio.trim() !== '' && { 
+          origenIntermedio: datosPasajero.origenIntermedio 
+        }),
+        ...(datosPasajero.destinoIntermedio && datosPasajero.destinoIntermedio.trim() !== '' && { 
+          destinoIntermedio: datosPasajero.destinoIntermedio 
+        }),
+        pago,
         estado: 'confirmado',
         createdAt: Timestamp.now(),
         updatedAt: Timestamp.now(),
-        // TODO: En el futuro, agregar origenIntermedio al modelo Booking
       };
-
-      // Solo agregar destinoIntermedio si tiene un valor válido
-      const reserva: Omit<Booking, 'id'> = datosPasajero.destinoIntermedio && datosPasajero.destinoIntermedio.trim() !== ''
-        ? { ...reservaBase, destinoIntermedio: datosPasajero.destinoIntermedio }
-        : reservaBase;
 
       transaction.set(nuevaReservaRef, reserva);
 
@@ -682,8 +665,10 @@ export async function getCashSummaryForTrip(viajeId: string): Promise<{
   };
 
   reservas.forEach((reserva) => {
-    resumen.total += reserva.monto;
-    resumen.porMetodo[reserva.metodoPago] += reserva.monto;
+    const monto = reserva.pago?.monto || 0;
+    const metodoPago = reserva.pago?.metodoPago || 'efectivo';
+    resumen.total += monto;
+    resumen.porMetodo[metodoPago] += monto;
   });
 
   return resumen;
@@ -704,4 +689,487 @@ export function subscribeToBookings(
     })) as Booking[];
     callback(reservas);
   });
+}
+
+// Helper: Obtener reservas con pagos pendientes de validación
+export async function getBookingsWithPendingPayments(): Promise<Booking[]> {
+  const reservasRef = collection(db, 'reservas');
+  const q = query(
+    reservasRef,
+    where('pago.estado', '==', 'pendiente'),
+    orderBy('createdAt', 'desc')
+  );
+
+  try {
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Booking[];
+  } catch (error) {
+    console.error('Error al obtener reservas con pagos pendientes:', error);
+    // Si falla por falta de índice, retornar todas y filtrar en memoria
+    const allReservas = await getDocs(reservasRef);
+    return allReservas.docs
+      .map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      } as Booking))
+      .filter((booking) => booking.pago?.estado === 'pendiente');
+  }
+}
+
+// Helper: Validar o rechazar un pago
+export async function validatePayment(
+  bookingId: string,
+  estado: 'validado' | 'rechazado',
+  validadoPor: string,
+  razonRechazo?: string
+): Promise<void> {
+  try {
+    const bookingRef = doc(db, 'reservas', bookingId);
+    const updateData: any = {
+      'pago.estado': estado,
+      'pago.validadoPor': validadoPor,
+      'pago.validadoEn': Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+
+    if (estado === 'rechazado' && razonRechazo) {
+      updateData['pago.razonRechazo'] = razonRechazo;
+      
+      // Anular boleto si existe
+      updateData['boleto.estado'] = 'anulado';
+      updateData['boleto.anuladoEn'] = Timestamp.now();
+    }
+
+    await updateDoc(bookingRef, updateData);
+  } catch (error) {
+    console.error('Error al validar pago:', error);
+    throw new Error('No se pudo actualizar el estado del pago');
+  }
+}
+
+// Helper: Buscar boleto por número de ticket
+export async function getBookingByTicketNumber(numeroTicket: string): Promise<Booking | null> {
+  try {
+    const reservasRef = collection(db, 'reservas');
+    const q = query(
+      reservasRef,
+      where('boleto.numeroTicket', '==', numeroTicket),
+      limit(1)
+    );
+
+    const snapshot = await getDocs(q);
+    if (snapshot.empty) {
+      return null;
+    }
+
+    return {
+      id: snapshot.docs[0].id,
+      ...snapshot.docs[0].data(),
+    } as Booking;
+  } catch (error) {
+    console.error('Error al buscar boleto:', error);
+    return null;
+  }
+}
+
+// Helper: Buscar boletos por DNI del pasajero
+export async function getBookingsByDni(dni: string): Promise<Booking[]> {
+  try {
+    const reservasRef = collection(db, 'reservas');
+    const q = query(
+      reservasRef,
+      where('dniPasajero', '==', dni),
+      orderBy('createdAt', 'desc')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Booking[];
+  } catch (error) {
+    console.error('Error al buscar boletos por DNI:', error);
+    return [];
+  }
+}
+
+// Helper: Marcar boleto como usado (embarcado)
+export async function markTicketAsUsed(bookingId: string): Promise<void> {
+  try {
+    const bookingRef = doc(db, 'reservas', bookingId);
+    await updateDoc(bookingRef, {
+      estado: 'embarcado',
+      'boleto.estado': 'usado',
+      'boleto.usadoEn': Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al marcar boleto como usado:', error);
+    throw new Error('No se pudo actualizar el estado del boleto');
+  }
+}
+
+// ============================================================================
+// CRUD RUTAS
+// ============================================================================
+
+// Obtener todas las rutas
+export async function getAllRoutes(): Promise<Route[]> {
+  try {
+    const rutasRef = collection(db, 'rutas');
+    const q = query(rutasRef, orderBy('origen', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Route[];
+  } catch (error) {
+    console.error('Error al obtener rutas:', error);
+    throw new Error('No se pudieron obtener las rutas');
+  }
+}
+
+// Crear nueva ruta
+export async function createRoute(rutaData: Omit<Route, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    const rutasRef = collection(db, 'rutas');
+    const nuevaRuta = {
+      ...rutaData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+    const docRef = await addDoc(rutasRef, nuevaRuta);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error al crear ruta:', error);
+    throw new Error('No se pudo crear la ruta');
+  }
+}
+
+// Actualizar ruta
+export async function updateRoute(rutaId: string, updates: Partial<Omit<Route, 'id' | 'createdAt'>>): Promise<void> {
+  try {
+    const rutaRef = doc(db, 'rutas', rutaId);
+    await updateDoc(rutaRef, {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al actualizar ruta:', error);
+    throw new Error('No se pudo actualizar la ruta');
+  }
+}
+
+// Eliminar ruta
+export async function deleteRoute(rutaId: string): Promise<void> {
+  try {
+    // Verificar si tiene viajes asociados
+    const viajesRef = collection(db, 'viajes');
+    const q = query(viajesRef, where('rutaId', '==', rutaId), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      throw new Error('No se puede eliminar la ruta porque tiene viajes asociados');
+    }
+
+    const rutaRef = doc(db, 'rutas', rutaId);
+    await updateDoc(rutaRef, {
+      activa: false,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al eliminar ruta:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudo eliminar la ruta');
+  }
+}
+
+// ============================================================================
+// CRUD EMBARCACIONES
+// ============================================================================
+
+// Obtener todas las embarcaciones
+export async function getAllVessels(): Promise<Vessel[]> {
+  try {
+    const embarcacionesRef = collection(db, 'embarcaciones');
+    const q = query(embarcacionesRef, orderBy('nombre', 'asc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Vessel[];
+  } catch (error) {
+    console.error('Error al obtener embarcaciones:', error);
+    throw new Error('No se pudieron obtener las embarcaciones');
+  }
+}
+
+// Crear nueva embarcación
+export async function createVessel(embarcacionData: Omit<Vessel, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    // Validar que capacidad = filas * columnas
+    const capacidadCalculada = embarcacionData.filas * embarcacionData.columnas;
+    if (embarcacionData.capacidad !== capacidadCalculada) {
+      throw new Error(`La capacidad (${embarcacionData.capacidad}) debe ser igual a filas × columnas (${capacidadCalculada})`);
+    }
+
+    const embarcacionesRef = collection(db, 'embarcaciones');
+    const nuevaEmbarcacion = {
+      ...embarcacionData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+    const docRef = await addDoc(embarcacionesRef, nuevaEmbarcacion);
+    return docRef.id;
+  } catch (error) {
+    console.error('Error al crear embarcación:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudo crear la embarcación');
+  }
+}
+
+// Actualizar embarcación
+export async function updateVessel(embarcacionId: string, updates: Partial<Omit<Vessel, 'id' | 'createdAt'>>): Promise<void> {
+  try {
+    // Si se actualizan filas o columnas, validar capacidad
+    if (updates.filas !== undefined || updates.columnas !== undefined || updates.capacidad !== undefined) {
+      const embarcacionActual = await getVessel(embarcacionId);
+      if (!embarcacionActual) {
+        throw new Error('Embarcación no encontrada');
+      }
+
+      const filas = updates.filas ?? embarcacionActual.filas;
+      const columnas = updates.columnas ?? embarcacionActual.columnas;
+      const capacidad = updates.capacidad ?? embarcacionActual.capacidad;
+      const capacidadCalculada = filas * columnas;
+
+      if (capacidad !== capacidadCalculada) {
+        throw new Error(`La capacidad (${capacidad}) debe ser igual a filas × columnas (${capacidadCalculada})`);
+      }
+    }
+
+    const embarcacionRef = doc(db, 'embarcaciones', embarcacionId);
+    await updateDoc(embarcacionRef, {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al actualizar embarcación:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudo actualizar la embarcación');
+  }
+}
+
+// Eliminar embarcación (marcar como inactiva)
+export async function deleteVessel(embarcacionId: string): Promise<void> {
+  try {
+    // Verificar si tiene viajes asociados
+    const viajesRef = collection(db, 'viajes');
+    const q = query(viajesRef, where('embarcacionId', '==', embarcacionId), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      throw new Error('No se puede eliminar la embarcación porque tiene viajes asociados');
+    }
+
+    const embarcacionRef = doc(db, 'embarcaciones', embarcacionId);
+    await updateDoc(embarcacionRef, {
+      activa: false,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al eliminar embarcación:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudo eliminar la embarcación');
+  }
+}
+
+// ============================================================================
+// CRUD VIAJES
+// ============================================================================
+
+// Obtener todos los viajes
+export async function getAllTrips(): Promise<Trip[]> {
+  try {
+    const viajesRef = collection(db, 'viajes');
+    const q = query(viajesRef, orderBy('fechaSalida', 'desc'));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Trip[];
+  } catch (error) {
+    console.error('Error al obtener viajes:', error);
+    throw new Error('No se pudieron obtener los viajes');
+  }
+}
+
+// Crear nuevo viaje y generar asientos automáticamente
+export async function createTrip(
+  tripData: Omit<Trip, 'id' | 'createdAt' | 'updatedAt'>,
+  embarcacion: Vessel
+): Promise<string> {
+  try {
+    // Crear el viaje
+    const viajesRef = collection(db, 'viajes');
+    const nuevoViaje = {
+      ...tripData,
+      createdAt: Timestamp.now(),
+      updatedAt: Timestamp.now(),
+    };
+    const viajeDocRef = await addDoc(viajesRef, nuevoViaje);
+    const viajeId = viajeDocRef.id;
+
+    // Generar asientos automáticamente según la configuración de la embarcación
+    await generateSeatsForTrip(viajeId, embarcacion);
+
+    return viajeId;
+  } catch (error) {
+    console.error('Error al crear viaje:', error);
+    throw new Error('No se pudo crear el viaje');
+  }
+}
+
+// Generar asientos para un viaje según la configuración de la embarcación
+async function generateSeatsForTrip(viajeId: string, embarcacion: Vessel): Promise<void> {
+  try {
+    const asientosRef = collection(db, `viajes/${viajeId}/asientos`);
+    
+    // Generar asientos según la configuración de la embarcación
+    // Las columnas representan el total de asientos por fila (distribuidos en lado A y lado B)
+    // Layout: lado A (izquierda) | pasillo | lado B (derecha)
+    // Si columnas = 2: 1 asiento A + 1 asiento B = 2 asientos por fila
+    // Si columnas = 4: 2 asientos A + 2 asientos B = 4 asientos por fila
+    const asientos: Array<{
+      numeroAsiento: string;
+      fila: number;
+      columna: string;
+      posicion: 'ventana' | 'pasillo';
+    }> = [];
+
+    // Calcular asientos por lado (A y B)
+    // Las columnas representan el total de asientos por fila
+    // En layout 2-2: columnas se divide en lado A y lado B
+    const asientosPorLado = embarcacion.columnas / 2;
+    
+    // Validar que columnas sea par
+    if (embarcacion.columnas % 2 !== 0) {
+      throw new Error(`El número de columnas (${embarcacion.columnas}) debe ser par para el layout 2-2`);
+    }
+
+    // Contador global para números de asiento únicos
+    let contadorGlobal = 1;
+
+    for (let fila = 1; fila <= embarcacion.filas; fila++) {
+      // Para cada fila, generar asientos lado A y lado B
+      // Los números de asiento deben ser consecutivos por fila
+      const inicioFila = (fila - 1) * asientosPorLado + 1;
+      
+      // Lado A (izquierda): desde ventana hasta pasillo
+      for (let posA = 1; posA <= asientosPorLado; posA++) {
+        const esVentanaA = posA === 1;
+        const numeroAsientoA = `A${inicioFila + posA - 1}`;
+        
+        asientos.push({
+          numeroAsiento: numeroAsientoA,
+          fila,
+          columna: 'A',
+          posicion: esVentanaA ? 'ventana' : 'pasillo',
+        });
+      }
+
+      // Lado B (derecha): desde pasillo hasta ventana
+      // Usar el mismo rango numérico que lado A para mantener consistencia
+      for (let posB = 1; posB <= asientosPorLado; posB++) {
+        const esVentanaB = posB === asientosPorLado;
+        const numeroAsientoB = `B${inicioFila + posB - 1}`;
+        
+        asientos.push({
+          numeroAsiento: numeroAsientoB,
+          fila,
+          columna: 'B',
+          posicion: esVentanaB ? 'ventana' : 'pasillo',
+        });
+      }
+    }
+
+    // Usar batches para escribir (máximo 500 operaciones por batch)
+    const batchSize = 500;
+    for (let i = 0; i < asientos.length; i += batchSize) {
+      const batch = writeBatch(db);
+      const chunk = asientos.slice(i, i + batchSize);
+      
+      chunk.forEach((asiento) => {
+        // Crear referencia con ID automático
+        const asientoRef = doc(asientosRef);
+        batch.set(asientoRef, {
+          id: asientoRef.id,
+          viajeId,
+          numeroAsiento: asiento.numeroAsiento,
+          fila: asiento.fila,
+          columna: asiento.columna,
+          posicion: asiento.posicion,
+          estado: 'disponible',
+          createdAt: Timestamp.now(),
+          updatedAt: Timestamp.now(),
+        });
+      });
+
+      await batch.commit();
+    }
+  } catch (error) {
+    console.error('Error al generar asientos:', error);
+    throw new Error('No se pudieron generar los asientos');
+  }
+}
+
+// Actualizar viaje (solo si no tiene reservas)
+export async function updateTrip(tripId: string, updates: Partial<Omit<Trip, 'id' | 'createdAt'>>): Promise<void> {
+  try {
+    // Verificar si tiene reservas
+    const reservasRef = collection(db, 'reservas');
+    const q = query(reservasRef, where('viajeId', '==', tripId), limit(1));
+    const snapshot = await getDocs(q);
+    
+    if (!snapshot.empty) {
+      throw new Error('No se puede editar el viaje porque ya tiene reservas');
+    }
+
+    const viajeRef = doc(db, 'viajes', tripId);
+    await updateDoc(viajeRef, {
+      ...updates,
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al actualizar viaje:', error);
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error('No se pudo actualizar el viaje');
+  }
+}
+
+// Eliminar viaje (cancelar)
+export async function deleteTrip(tripId: string): Promise<void> {
+  try {
+    const viajeRef = doc(db, 'viajes', tripId);
+    await updateDoc(viajeRef, {
+      estado: 'cancelado',
+      updatedAt: Timestamp.now(),
+    });
+  } catch (error) {
+    console.error('Error al eliminar viaje:', error);
+    throw new Error('No se pudo eliminar el viaje');
+  }
 }

@@ -18,11 +18,21 @@ import {
   buscarPasajeroPorDni,
   getRoute,
   obtenerPuntoOrigenMasAvanzado,
-  obtenerDestinosDisponiblesDesde
+  obtenerDestinosDisponiblesDesde,
+  obtenerOrdenParadas,
+  getTrip,
+  getVessel,
 } from "@/lib/firestore-helpers";
-import type { Seat, Route } from "@/lib/firestore-helpers";
-import { Loader2, User, Phone, MapPin, Wallet, CheckCircle2, Ticket } from "lucide-react";
+import type { Seat, Route, Booking } from "@/lib/firestore-helpers";
+import { generateTicketNumber, verificarNumeroTicketUnico } from "@/lib/ticket-number-generator";
+import { generateTicketQR, type QRTicketData } from "@/lib/qr-generator";
+import { doc, updateDoc, getDoc, Timestamp } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import { Loader2, User, Phone, MapPin, Wallet, CheckCircle2, Ticket, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { PaymentScreenshotUploader } from "./PaymentScreenshotUploader";
+import { uploadPaymentScreenshot } from "@/lib/storage-helpers";
+import { TicketPreviewModal } from "./TicketPreviewModal";
 
 interface QuickSaleModalProps {
   tripId: string;
@@ -31,6 +41,9 @@ interface QuickSaleModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onComplete: () => void;
+  // Props opcionales para optimización - evitar consultas duplicadas
+  rutaPrecargada?: Route;
+  bookingsPrecargados?: Booking[];
 }
 
 export function QuickSaleModal({
@@ -40,21 +53,29 @@ export function QuickSaleModal({
   open,
   onOpenChange,
   onComplete,
+  rutaPrecargada,
+  bookingsPrecargados,
 }: QuickSaleModalProps) {
   const [formData, setFormData] = useState({
     dni: "",
     nombre: "",
     telefono: "",
+    whatsapp: "",
     destinoIntermedio: "",
     monto: "",
     metodoPago: "efectivo" as "efectivo" | "yape" | "plin",
   });
+  const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [buscandoPasajero, setBuscandoPasajero] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ruta, setRuta] = useState<Route | null>(null);
   const [destinosDisponibles, setDestinosDisponibles] = useState<Array<{ nombre: string; precio: number; esDestinoFinal: boolean }>>([]);
   const [puntoOrigen, setPuntoOrigen] = useState<string>("");
+  const [showTicketPreview, setShowTicketPreview] = useState(false);
+  const [ticketBooking, setTicketBooking] = useState<Booking | null>(null);
+  const [ticketNumber, setTicketNumber] = useState<string>("");
+  const [ticketWhatsapp, setTicketWhatsapp] = useState<string>("");
 
   useEffect(() => {
     if (open && rutaId && tripId && seat.id) {
@@ -64,15 +85,48 @@ export function QuickSaleModal({
 
   async function loadRouteAndDestinos() {
     try {
-      const rutaData = await getRoute(rutaId);
+      // Usar ruta precargada si está disponible (evitar consulta duplicada)
+      let rutaData: Route | null = rutaPrecargada || null;
+      
+      if (!rutaData) {
+        rutaData = await getRoute(rutaId);
+      }
+      
       if (rutaData) {
         setRuta(rutaData);
 
-        const puntoOrigenAvanzado = await obtenerPuntoOrigenMasAvanzado(
-          tripId,
-          seat.id,
-          rutaData
-        );
+        // Usar bookings precargados si están disponibles (evitar consulta duplicada)
+        let puntoOrigenAvanzado: string;
+        
+        if (bookingsPrecargados && bookingsPrecargados.length >= 0) {
+          // Calcular punto de origen usando bookings precargados (más rápido)
+          if (bookingsPrecargados.length === 0) {
+            puntoOrigenAvanzado = rutaData.origen;
+          } else {
+            const orden = obtenerOrdenParadas(rutaData);
+            let maxOrden = -1;
+            let puntoMasAvanzado = rutaData.origen;
+
+            for (const reserva of bookingsPrecargados) {
+              const destinoReserva = reserva.destinoIntermedio || rutaData.destino;
+              const ordenDestino = orden.get(destinoReserva) ?? -1;
+
+              if (ordenDestino > maxOrden) {
+                maxOrden = ordenDestino;
+                puntoMasAvanzado = destinoReserva;
+              }
+            }
+            puntoOrigenAvanzado = puntoMasAvanzado;
+          }
+        } else {
+          // Fallback: consultar si no hay bookings precargados
+          puntoOrigenAvanzado = await obtenerPuntoOrigenMasAvanzado(
+            tripId,
+            seat.id,
+            rutaData
+          );
+        }
+        
         setPuntoOrigen(puntoOrigenAvanzado);
 
         const destinos = obtenerDestinosDisponiblesDesde(rutaData, puntoOrigenAvanzado);
@@ -149,8 +203,16 @@ export function QuickSaleModal({
     setLoading(true);
 
     try {
+      // Validar campos obligatorios
       if (!formData.dni || !formData.nombre || !formData.telefono || !formData.monto) {
         setError("Por favor completa todos los campos obligatorios");
+        setLoading(false);
+        return;
+      }
+
+      // Validar WhatsApp para YAPE/PLIN
+      if ((formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && !formData.whatsapp) {
+        setError("El número de WhatsApp es obligatorio para pagos YAPE/PLIN");
         setLoading(false);
         return;
       }
@@ -162,10 +224,21 @@ export function QuickSaleModal({
         return;
       }
 
-      const datosReserva: {
+      if (!ruta) {
+        setError("No se pudo cargar la información de la ruta");
+        setLoading(false);
+        return;
+      }
+
+      // ========================================================================
+      // PASO 0: Crear reserva primero (necesitamos bookingId para subir screenshot)
+      // ========================================================================
+      // Preparar datos de reserva sin screenshot (se agregará después)
+      const datosReservaInicial: {
         nombre: string;
         dni: string;
         telefono: string;
+        whatsapp?: string;
         destinoIntermedio?: string;
         monto: number;
         metodoPago: 'efectivo' | 'yape' | 'plin';
@@ -176,31 +249,130 @@ export function QuickSaleModal({
         telefono: formData.telefono,
         monto: monto,
         metodoPago: formData.metodoPago,
-        origenIntermedio: puntoOrigen
+        origenIntermedio: puntoOrigen,
+        ...(formData.whatsapp && { whatsapp: formData.whatsapp }),
       };
 
       if (formData.destinoIntermedio && formData.destinoIntermedio.trim() !== '' && formData.destinoIntermedio !== ruta?.destino) {
-        datosReserva.destinoIntermedio = formData.destinoIntermedio;
+        datosReservaInicial.destinoIntermedio = formData.destinoIntermedio;
       }
 
-      if (!ruta) {
-        setError("No se pudo cargar la información de la ruta");
-        setLoading(false);
-        return;
+      // ========================================================================
+      // OPTIMIZACIÓN: Ejecutar operaciones en paralelo para reducir tiempo
+      // ========================================================================
+      
+      // 1. Generar número de ticket y obtener datos del viaje EN PARALELO
+      const [numeroTicket, viaje] = await Promise.all([
+        generateTicketNumber(), // Generar ticket
+        getTrip(tripId), // Obtener viaje
+      ]);
+
+      if (!viaje) {
+        throw new Error('No se pudo obtener información del viaje');
       }
 
-      await createBooking(tripId, seat.id, datosReserva, ruta);
+      // 2. Obtener embarcación (ya tenemos viaje)
+      const embarcacionData = await getVessel(viaje.embarcacionId);
+      if (!embarcacionData) {
+        throw new Error('No se pudo obtener información de la embarcación');
+      }
 
+      // 3. Preparar datos del QR
+      const qrData: QRTicketData = {
+        numeroTicket,
+        viajeId: tripId,
+        asientoId: seat.id,
+        dniPasajero: formData.dni,
+        asientoNumero: seat.numeroAsiento,
+        timestamp: new Date().toISOString(),
+      };
+
+      // 4. Generar QR primero (más rápido que crear reserva)
+      const codigoQr = await generateTicketQR(qrData, 150); // Tamaño más pequeño = generación más rápida
+
+      // 5. Crear reserva (esta es la operación más lenta, pero necesaria)
+      const bookingId = await createBooking(tripId, seat.id, datosReservaInicial, ruta);
+
+      // 6. Actualizar reserva con boleto completo (UNA SOLA operación)
+      const bookingRef = doc(db, 'reservas', bookingId);
+      await updateDoc(bookingRef, {
+        boleto: {
+          numeroTicket,
+          codigoQr,
+          estado: 'emitido',
+          emitidoEn: Timestamp.now(),
+        },
+        updatedAt: Timestamp.now(),
+      });
+
+      // 7. Subir screenshot EN BACKGROUND (no bloquea la venta - se actualiza después)
+      if ((formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && screenshotFile) {
+        // No esperamos - se sube en background sin bloquear
+        uploadPaymentScreenshot(screenshotFile, tripId, bookingId)
+          .then((result) => {
+            updateDoc(doc(db, 'reservas', bookingId), {
+              'pago.screenshotUrl': result.url,
+              'pago.screenshotPath': result.path,
+              updatedAt: Timestamp.now(),
+            }).catch(err => console.error('Error al actualizar screenshot:', err));
+          })
+          .catch(err => console.error('Error al subir screenshot:', err));
+      }
+
+      // 8. Construir bookingData directamente (evitar consulta innecesaria)
+      const bookingData: Booking = {
+        id: bookingId,
+        viajeId: tripId,
+        asientoId: seat.id,
+        nombrePasajero: formData.nombre,
+        dniPasajero: formData.dni,
+        telefonoPasajero: formData.telefono,
+        whatsappPasajero: formData.whatsapp,
+        origenIntermedio: puntoOrigen,
+        destinoIntermedio: formData.destinoIntermedio || ruta?.destino,
+        estado: 'confirmado',
+        pago: {
+          monto: monto,
+          metodoPago: formData.metodoPago,
+          estado: formData.metodoPago === 'efectivo' ? 'validado' : 'pendiente',
+          validadoPor: formData.metodoPago === 'efectivo' ? 'sistema' : undefined,
+          validadoEn: formData.metodoPago === 'efectivo' ? Timestamp.now() : undefined,
+        },
+        boleto: {
+          numeroTicket,
+          codigoQr,
+          estado: 'emitido',
+          emitidoEn: Timestamp.now(),
+        },
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      };
+
+      // ========================================================================
+      // PASO 7: Mostrar preview del boleto en HTML (sin generar PDF)
+      // NO cerrar el modal de venta todavía - se cerrará cuando el usuario cierre el preview
+      // ========================================================================
+      setTicketBooking(bookingData);
+      setTicketNumber(numeroTicket);
+      setTicketWhatsapp(formData.whatsapp || "");
+      setShowTicketPreview(true);
+
+      // ========================================================================
+      // PASO 8: Limpiar formulario (pero NO cerrar el modal todavía)
+      // ========================================================================
       setFormData({
         dni: "",
         nombre: "",
         telefono: "",
+        whatsapp: "",
         destinoIntermedio: "",
         monto: "",
         metodoPago: "efectivo",
       });
-      onComplete();
-      onOpenChange(false);
+      setScreenshotFile(null);
+      
+      // NO llamar onComplete() ni onOpenChange(false) aquí
+      // El modal se cerrará cuando el usuario cierre el preview del boleto
     } catch (err: any) {
       console.error("Error al crear reserva:", err);
       setError(
@@ -226,8 +398,9 @@ export function QuickSaleModal({
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-border bg-background">
+      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-border bg-background max-h-[90vh] flex flex-col">
         {/* Header limpio - SIN gradiente */}
         <div className="border-b border-border p-6 bg-muted/30">
           <DialogHeader>
@@ -243,8 +416,8 @@ export function QuickSaleModal({
           </DialogHeader>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col h-full">
-          <div className="p-6 space-y-5">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+          <div className="p-6 space-y-5 overflow-y-auto flex-1">
             <div className="grid grid-cols-2 gap-4">
               {/* DNI */}
               <div className="space-y-2">
@@ -306,6 +479,32 @@ export function QuickSaleModal({
                 required
               />
             </div>
+
+            {/* WhatsApp (solo para YAPE/PLIN) */}
+            {(formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && (
+              <div className="space-y-2">
+                <Label htmlFor="whatsapp" className="text-xs font-semibold text-muted-foreground uppercase">
+                  WhatsApp <span className="text-error">*</span>
+                </Label>
+                <div className="relative group">
+                  <MessageCircle className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                  <Input
+                    id="whatsapp"
+                    name="whatsapp"
+                    type="tel"
+                    className="pl-9"
+                    placeholder="999 999 999"
+                    value={formData.whatsapp}
+                    onChange={handleChange}
+                    required
+                    maxLength={9}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Para enviar el boleto por WhatsApp
+                </p>
+              </div>
+            )}
 
             {/* Separador */}
             <div className="h-px bg-border w-full my-1" />
@@ -416,6 +615,22 @@ export function QuickSaleModal({
               </div>
             </div>
 
+            {/* Carga de screenshot (solo para YAPE/PLIN) */}
+            {(formData.metodoPago === 'yape' || formData.metodoPago === 'plin') && (
+              <div className="space-y-2">
+                <PaymentScreenshotUploader
+                  viajeId={tripId}
+                  onFileSelect={(file) => {
+                    setScreenshotFile(file);
+                  }}
+                  onUploadError={(errorMsg) => {
+                    setError(`Error al subir comprobante: ${errorMsg}`);
+                  }}
+                  disabled={loading}
+                />
+              </div>
+            )}
+
             {/* Error */}
             {error && (
               <div className="rounded-lg bg-error/10 border border-error/20 p-3 text-sm text-error flex items-center gap-2">
@@ -424,7 +639,7 @@ export function QuickSaleModal({
             )}
           </div>
 
-          <DialogFooter className="p-6 bg-muted/30 border-t border-border">
+          <DialogFooter className="p-6 bg-muted/30 border-t border-border flex-shrink-0">
             <Button
               type="button"
               variant="outline"
@@ -453,5 +668,25 @@ export function QuickSaleModal({
         </form>
       </DialogContent>
     </Dialog>
+    {showTicketPreview && ticketBooking && (
+      <TicketPreviewModal
+        open={showTicketPreview}
+        onOpenChange={(open) => {
+          setShowTicketPreview(open);
+          if (!open) {
+            // Cuando se cierra el preview, cerrar también el modal de venta y limpiar
+            setTicketBooking(null);
+            setTicketNumber("");
+            setTicketWhatsapp("");
+            onComplete(); // Notificar que la venta se completó
+            onOpenChange(false); // Cerrar el modal de venta
+          }
+        }}
+        booking={ticketBooking}
+        numeroTicket={ticketNumber}
+        whatsappPasajero={ticketWhatsapp}
+      />
+    )}
+    </>
   );
 }

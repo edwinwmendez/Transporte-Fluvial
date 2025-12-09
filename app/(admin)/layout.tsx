@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Ship, LayoutDashboard, Receipt } from "lucide-react";
+import { Ship, LayoutDashboard, Receipt, CheckCircle2, Ticket, MapPin, Calendar, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function AdminLayout({
@@ -30,6 +30,70 @@ export default function AdminLayout({
               <Link href="/dashboard">
                 <LayoutDashboard className="h-4 w-4" />
                 Dashboard
+              </Link>
+            </Button>
+            
+            <div className="my-2 border-t" />
+            
+            <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
+              Gestión
+            </div>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/rutas">
+                <MapPin className="h-4 w-4" />
+                Rutas
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/embarcaciones">
+                <Ship className="h-4 w-4" />
+                Embarcaciones
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/viajes">
+                <Calendar className="h-4 w-4" />
+                Viajes
+              </Link>
+            </Button>
+            
+            <div className="my-2 border-t" />
+            
+            <div className="px-2 py-1 text-xs font-semibold text-muted-foreground uppercase">
+              Operaciones
+            </div>
+            
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/validar-pagos">
+                <Receipt className="h-4 w-4" />
+                Validar Pagos
+              </Link>
+            </Button>
+            <Button
+              variant="ghost"
+              className="w-full justify-start gap-2"
+              asChild
+            >
+              <Link href="/validar-boletos">
+                <Ticket className="h-4 w-4" />
+                Validar Boletos
               </Link>
             </Button>
           </nav>
