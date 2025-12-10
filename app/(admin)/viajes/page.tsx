@@ -121,7 +121,7 @@ export default function ViajesPage() {
   function handleOpenDialog(trip?: Trip) {
     if (trip) {
       setEditingTrip(trip);
-      const fecha = trip.fechaSalida?.toDate ? trip.fechaSalida.toDate() : new Date(trip.fechaSalida);
+      const fecha = trip.fechaSalida?.toDate ? trip.fechaSalida.toDate() : (trip.fechaSalida instanceof Date ? trip.fechaSalida : new Date());
       const fechaStr = formatLocalDate(fecha);
       setFormData({
         rutaId: trip.rutaId,
@@ -320,7 +320,7 @@ export default function ViajesPage() {
       setProgresoGeneracion(null);
 
       if (totalGenerados === 0) {
-        toast.info("Todos los viajes para este rango ya existen");
+        toast.success("Todos los viajes para este rango ya existen");
       } else {
         toast.success(
           `Se generaron ${totalGenerados} viaje${totalGenerados !== 1 ? "s" : ""} exitosamente. ` +
