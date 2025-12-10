@@ -1,196 +1,79 @@
 /**
- * Utilidades para manejo responsive
- * Proporciona funciones y hooks para detectar breakpoints y ajustar UI
+ * Utilidades para diseño responsivo
+ * Breakpoints según PRD:
+ * - Mobile: 320px - 767px
+ * - Tablet: 768px - 1023px
+ * - Desktop: 1024px+
  */
 
-import { useState, useEffect } from 'react';
-
-/**
- * Breakpoints según el PRD
- */
 export const breakpoints = {
-  xs: 320,
-  sm: 640,
-  md: 768,
-  lg: 1024,
-  xl: 1280,
-  '2xl': 1536,
+  xs: '320px',   // Móvil pequeño
+  sm: '640px',   // Móvil grande
+  md: '768px',   // Tablet
+  lg: '1024px',  // Desktop
+  xl: '1280px',  // Desktop grande
+  '2xl': '1536px', // Desktop extra grande
 } as const;
 
 export type Breakpoint = keyof typeof breakpoints;
 
 /**
- * Hook para detectar el breakpoint actual
+ * Hook para detectar el tamaño de pantalla (usar en client components)
+ * Retorna el breakpoint actual
  */
-export function useBreakpoint(): Breakpoint {
-  const [breakpoint, setBreakpoint] = useState<Breakpoint>('xs');
-
-  useEffect(() => {
-    const updateBreakpoint = () => {
-      const width = window.innerWidth;
-      
-      if (width >= breakpoints['2xl']) {
-        setBreakpoint('2xl');
-      } else if (width >= breakpoints.xl) {
-        setBreakpoint('xl');
-      } else if (width >= breakpoints.lg) {
-        setBreakpoint('lg');
-      } else if (width >= breakpoints.md) {
-        setBreakpoint('md');
-      } else if (width >= breakpoints.sm) {
-        setBreakpoint('sm');
-      } else {
-        setBreakpoint('xs');
-      }
-    };
-
-    updateBreakpoint();
-    window.addEventListener('resize', updateBreakpoint);
-    
-    return () => window.removeEventListener('resize', updateBreakpoint);
-  }, []);
-
-  return breakpoint;
-}
-
-/**
- * Hook para detectar si es móvil
- */
-export function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => {
-      setIsMobile(window.innerWidth < breakpoints.md);
-    };
-
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  return isMobile;
-}
-
-/**
- * Hook para detectar si es tablet
- */
-export function useIsTablet(): boolean {
-  const [isTablet, setIsTablet] = useState(false);
-
-  useEffect(() => {
-    const checkTablet = () => {
-      const width = window.innerWidth;
-      setIsTablet(width >= breakpoints.md && width < breakpoints.lg);
-    };
-
-    checkTablet();
-    window.addEventListener('resize', checkTablet);
-    
-    return () => window.removeEventListener('resize', checkTablet);
-  }, []);
-
-  return isTablet;
-}
-
-/**
- * Hook para detectar si es desktop
- */
-export function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(false);
-
-  useEffect(() => {
-    const checkDesktop = () => {
-      setIsDesktop(window.innerWidth >= breakpoints.lg);
-    };
-
-    checkDesktop();
-    window.addEventListener('resize', checkDesktop);
-    
-    return () => window.removeEventListener('resize', checkDesktop);
-  }, []);
-
-  return isDesktop;
-}
-
-/**
- * Hook para obtener el ancho de la ventana
- */
-export function useWindowWidth(): number {
-  const [width, setWidth] = useState(0);
-
-  useEffect(() => {
-    const updateWidth = () => {
-      setWidth(window.innerWidth);
-    };
-
-    updateWidth();
-    window.addEventListener('resize', updateWidth);
-    
-    return () => window.removeEventListener('resize', updateWidth);
-  }, []);
-
-  return width;
-}
-
-/**
- * Hook para obtener la altura de la ventana
- */
-export function useWindowHeight(): number {
-  const [height, setHeight] = useState(0);
-
-  useEffect(() => {
-    const updateHeight = () => {
-      setHeight(window.innerHeight);
-    };
-
-    updateHeight();
-    window.addEventListener('resize', updateHeight);
-    
-    return () => window.removeEventListener('resize', updateHeight);
-  }, []);
-
-  return height;
-}
-
-/**
- * Función helper para obtener clases responsive condicionales
- */
-export function getResponsiveClasses(
-  mobile: string,
-  tablet?: string,
-  desktop?: string
-): string {
-  const classes = [mobile];
+export function useBreakpoint() {
+  if (typeof window === 'undefined') return 'lg';
   
-  if (tablet) {
-    classes.push(`md:${tablet}`);
-  }
+  const width = window.innerWidth;
   
-  if (desktop) {
-    classes.push(`lg:${desktop}`);
-  }
-  
-  return classes.join(' ');
+  if (width >= 1536) return '2xl';
+  if (width >= 1280) return 'xl';
+  if (width >= 1024) return 'lg';
+  if (width >= 768) return 'md';
+  if (width >= 640) return 'sm';
+  return 'xs';
 }
 
 /**
- * Función para obtener el número de columnas según el breakpoint
+ * Verifica si la pantalla es móvil (< 768px)
  */
-export function getGridColumns(breakpoint: Breakpoint): number {
-  switch (breakpoint) {
-    case 'xs':
-    case 'sm':
-      return 1;
-    case 'md':
-      return 2;
-    case 'lg':
-      return 3;
-    case 'xl':
-    case '2xl':
-      return 4;
-    default:
-      return 1;
-  }
+export function isMobile(width?: number): boolean {
+  const screenWidth = width ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  return screenWidth < 768;
 }
+
+/**
+ * Verifica si la pantalla es tablet (768px - 1023px)
+ */
+export function isTablet(width?: number): boolean {
+  const screenWidth = width ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  return screenWidth >= 768 && screenWidth < 1024;
+}
+
+/**
+ * Verifica si la pantalla es desktop (>= 1024px)
+ */
+export function isDesktop(width?: number): boolean {
+  const screenWidth = width ?? (typeof window !== 'undefined' ? window.innerWidth : 1024);
+  return screenWidth >= 1024;
+}
+
+/**
+ * Clases de Tailwind para espaciado responsivo
+ */
+export const responsiveSpacing = {
+  container: 'px-4 sm:px-6 lg:px-8',
+  section: 'py-8 sm:py-12 lg:py-16',
+  gap: 'gap-4 sm:gap-6 lg:gap-8',
+  padding: 'p-4 sm:p-6 lg:p-8',
+} as const;
+
+/**
+ * Clases para grid responsivo
+ */
+export const responsiveGrid = {
+  '1-col': 'grid-cols-1',
+  '2-col': 'grid-cols-1 sm:grid-cols-2',
+  '3-col': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3',
+  '4-col': 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-4',
+} as const;

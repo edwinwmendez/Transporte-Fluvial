@@ -202,16 +202,17 @@ export default function RutasPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Rutas</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Rutas</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             Administra las rutas completas y parciales con sus precios
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Ruta
+        <Button onClick={() => handleOpenDialog()} className="touch-target">
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Nueva Ruta</span>
+          <span className="sm:hidden">Nueva</span>
         </Button>
       </div>
 
@@ -301,7 +302,7 @@ export default function RutasPage() {
 
       {/* Dialog de Crear/Editar */}
       <Dialog open={showDialog} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {editingRoute ? "Editar Ruta" : "Nueva Ruta"}
@@ -314,7 +315,8 @@ export default function RutasPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Origen y Destino: 2 columnas desde móviles normales (375px+) */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="origen">Origen *</Label>
                 <Input
@@ -339,7 +341,8 @@ export default function RutasPage() {
               </div>
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            {/* Distancia, Horas, Precio: 2 columnas en móvil, 3 en tablet+ */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="distancia">Distancia (km) *</Label>
                 <Input
@@ -396,20 +399,23 @@ export default function RutasPage() {
 
             {/* Paradas Intermedias */}
             <div className="space-y-4 pt-4 border-t">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <Label className="text-base font-semibold">Paradas Intermedias</Label>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={handleAddParada}
+                  className="touch-target w-full sm:w-auto"
                 >
-                  <Plus className="mr-2 h-4 w-4" />
-                  Agregar Parada
+                  <Plus className="h-4 w-4 sm:mr-2" />
+                  <span className="hidden sm:inline">Agregar Parada</span>
+                  <span className="sm:hidden">Agregar</span>
                 </Button>
               </div>
 
-              <div className="grid grid-cols-4 gap-2">
+              {/* Formulario de paradas: 2 columnas en móvil normal, 4 en desktop */}
+              <div className="grid grid-cols-1 min-[375px]:grid-cols-2 lg:grid-cols-4 gap-2">
                 <Input
                   placeholder="Nombre parada"
                   value={paradaForm.nombre}
@@ -441,7 +447,7 @@ export default function RutasPage() {
                 <Button
                   type="button"
                   onClick={handleAddParada}
-                  className="w-full"
+                  className="w-full touch-target"
                 >
                   Agregar
                 </Button>
@@ -454,11 +460,11 @@ export default function RutasPage() {
                     .map((parada, index) => (
                       <div
                         key={index}
-                        className="flex items-center justify-between p-3 bg-muted rounded-lg"
+                        className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 p-3 bg-muted rounded-lg"
                       >
-                        <div className="flex-1">
-                          <p className="font-medium">{parada.nombre}</p>
-                          <p className="text-sm text-muted-foreground">
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-sm sm:text-base truncate">{parada.nombre}</p>
+                          <p className="text-xs sm:text-sm text-muted-foreground">
                             {parada.distanciaDesdeOrigen} km • S/. {parada.precio.toFixed(2)}
                           </p>
                         </div>
@@ -466,6 +472,7 @@ export default function RutasPage() {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleRemoveParada(index)}
+                          className="touch-target self-end sm:self-auto"
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />
                         </Button>
@@ -476,11 +483,11 @@ export default function RutasPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto touch-target">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto touch-target">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingRoute ? "Actualizar" : "Crear"}
             </Button>

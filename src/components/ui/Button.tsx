@@ -1,67 +1,57 @@
-'use client';
+import * as React from "react"
+import { Slot } from "@radix-ui/react-slot"
+import { cva, type VariantProps } from "class-variance-authority"
+import { cn } from "@/lib/utils/cn"
 
-import { ButtonHTMLAttributes, ReactNode } from 'react';
-import { cn } from '@/lib/utils/cn';
+const buttonVariants = cva(
+  "inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 touch-target",
+  {
+    variants: {
+      variant: {
+        default: "bg-primary text-primary-foreground hover:bg-primary/90",
+        destructive:
+          "bg-destructive text-destructive-foreground hover:bg-destructive/90",
+        outline:
+          "border border-input bg-background hover:bg-accent hover:text-accent-foreground",
+        secondary:
+          "bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        ghost: "hover:bg-accent hover:text-accent-foreground",
+        link: "text-primary underline-offset-4 hover:underline",
+      },
+      size: {
+        default: "h-10 px-4 py-2",
+        sm: "h-9 rounded-md px-3",
+        lg: "h-11 rounded-md px-8",
+        icon: "h-10 w-10",
+        // Tamaños responsivos para móviles
+        mobile: "h-12 px-6 text-base sm:h-10 sm:px-4 sm:text-sm",
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+      size: "default",
+    },
+  }
+)
 
-interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
-  children: ReactNode;
-  variant?: 'primary' | 'secondary' | 'outline' | 'ghost' | 'danger';
-  size?: 'sm' | 'md' | 'lg';
-  fullWidth?: boolean;
-  loading?: boolean;
+export interface ButtonProps
+  extends React.ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof buttonVariants> {
+  asChild?: boolean
 }
 
-/**
- * Button component responsive
- * Asegura touch targets adecuados en móvil y tamaños apropiados
- */
-export function Button({
-  children,
-  variant = 'primary',
-  size = 'md',
-  fullWidth = false,
-  loading = false,
-  disabled,
-  className,
-  ...props
-}: ButtonProps) {
-  const baseStyles = 'font-medium rounded-lg transition-all duration-200 touch-target';
-  
-  const variants = {
-    primary: 'bg-primary text-white hover:bg-primary-dark active:bg-primary-dark disabled:opacity-50',
-    secondary: 'bg-secondary text-white hover:bg-secondary-dark active:bg-secondary-dark disabled:opacity-50',
-    outline: 'border-2 border-primary text-primary hover:bg-primary/10 active:bg-primary/20 disabled:opacity-50',
-    ghost: 'text-primary hover:bg-gray-100 active:bg-gray-200 disabled:opacity-50',
-    danger: 'bg-error text-white hover:bg-red-600 active:bg-red-700 disabled:opacity-50',
-  };
+const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+  ({ className, variant, size, asChild = false, ...props }, ref) => {
+    const Comp = asChild ? Slot : "button"
+    return (
+      <Comp
+        className={cn(buttonVariants({ variant, size, className }))}
+        ref={ref}
+        {...props}
+      />
+    )
+  }
+)
+Button.displayName = "Button"
 
-  const sizes = {
-    sm: 'px-3 py-1.5 text-sm min-h-[36px]',
-    md: 'px-4 py-2.5 text-base min-h-[44px] md:px-6 md:py-3',
-    lg: 'px-6 py-3 text-lg min-h-[48px] md:px-8 md:py-4',
-  };
-
-  return (
-    <button
-      className={cn(
-        baseStyles,
-        variants[variant],
-        sizes[size],
-        fullWidth && 'w-full',
-        loading && 'opacity-75 cursor-not-allowed',
-        className
-      )}
-      disabled={disabled || loading}
-      {...props}
-    >
-      {loading ? (
-        <span className="flex items-center justify-center gap-2">
-          <span className="animate-spin rounded-full h-4 w-4 border-2 border-current border-t-transparent" />
-          <span>Cargando...</span>
-        </span>
-      ) : (
-        children
-      )}
-    </button>
-  );
-}
+export { Button, buttonVariants }

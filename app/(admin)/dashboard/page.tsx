@@ -270,7 +270,7 @@ export default function DashboardPage() {
                       key={estado}
                       type="button"
                       onClick={() => toggleEstado(estado)}
-                      className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                      className={`rounded-md border px-3 py-2 text-xs sm:text-sm font-medium transition-colors touch-target ${
                         estados.includes(estado)
                           ? "bg-primary text-primary-foreground border-primary"
                           : "bg-background border-input hover:bg-muted"

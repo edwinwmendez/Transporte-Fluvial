@@ -449,14 +449,14 @@ export default function ViajesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Viajes</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Viajes</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             Administra los viajes programados. Los asientos se generan automáticamente.
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {horarios.length > 0 && (
             <Button
               variant="outline"
@@ -478,18 +478,22 @@ export default function ViajesPage() {
                 setShowGenerateDialog(true);
               }}
               disabled={generating}
+              className="touch-target"
             >
               {generating ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
               ) : (
-                <Play className="mr-2 h-4 w-4" />
+                <Play className="h-4 w-4 sm:mr-2" />
               )}
-              Generar desde Horarios
+              <span className="hidden md:inline">Generar desde Horarios</span>
+              <span className="md:hidden sm:inline">Desde Horarios</span>
+              <span className="sm:hidden">Generar</span>
             </Button>
           )}
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Viaje
+          <Button onClick={() => handleOpenDialog()} className="touch-target">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo Viaje</span>
+            <span className="sm:hidden">Nuevo</span>
           </Button>
         </div>
       </div>
@@ -504,7 +508,7 @@ export default function ViajesPage() {
             id="filtroEstado"
             value={filtroEstado}
             onChange={(e) => setFiltroEstado(e.target.value)}
-            className="rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
           >
             <option value="todos">Todos</option>
             <option value="programado">Programado</option>
@@ -573,7 +577,7 @@ export default function ViajesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, rutaId: e.target.value })
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
                 disabled={editingTrip !== null}
               >
                 <option value="">Selecciona una ruta</option>
@@ -593,7 +597,7 @@ export default function ViajesPage() {
                 onChange={(e) =>
                   setFormData({ ...formData, embarcacionId: e.target.value })
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
                 disabled={editingTrip !== null}
               >
                 <option value="">Selecciona una embarcación</option>
@@ -605,7 +609,8 @@ export default function ViajesPage() {
               </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Fecha y Hora de Salida: 2 columnas desde móviles normales (375px+) */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fechaSalida">Fecha de Salida *</Label>
                 <Input
@@ -649,7 +654,7 @@ export default function ViajesPage() {
                     estado: e.target.value as Trip["estado"],
                   })
                 }
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:cursor-not-allowed"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:bg-muted disabled:cursor-not-allowed touch-target"
                 disabled={!editingTrip}
               >
                 <option value="programado">Programado</option>
@@ -665,11 +670,11 @@ export default function ViajesPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto touch-target">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto touch-target">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingTrip ? "Actualizar" : "Crear"}
             </Button>
@@ -679,7 +684,7 @@ export default function ViajesPage() {
 
       {/* Dialog de Generación Masiva desde Horarios */}
       <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Generar Viajes desde Horarios Recurrentes</DialogTitle>
             <DialogDescription>
@@ -688,7 +693,8 @@ export default function ViajesPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Fecha Inicio y Fin: 2 columnas desde móviles normales (375px+) */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fechaInicioGen">Fecha Inicio *</Label>
                 <Input
@@ -812,17 +818,18 @@ export default function ViajesPage() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button variant="outline" onClick={() => {
               setShowGenerateDialog(false);
               setSelectedHorarios(new Set());
               setProgresoGeneracion(null);
-            }}>
+            }} className="w-full sm:w-auto touch-target">
               Cancelar
             </Button>
             <Button
               onClick={handleGenerateFromHorarios}
               disabled={generating || horarios.length === 0 || selectedHorarios.size === 0}
+              className="w-full sm:w-auto touch-target"
             >
               {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Generar Viajes

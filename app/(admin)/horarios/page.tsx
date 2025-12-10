@@ -510,29 +510,32 @@ export default function HorariosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Horarios Recurrentes</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Horarios Recurrentes</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             Define horarios recurrentes para generar viajes automáticamente
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Button
             variant="outline"
             onClick={handleOpenGenerateNextMonthDialog}
             disabled={generating || horarios.filter((h) => h.activo).length === 0}
+            className="touch-target"
           >
             {generating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
             ) : (
-              <Calendar className="mr-2 h-4 w-4" />
+              <Calendar className="h-4 w-4 sm:mr-2" />
             )}
-            Generar Próximo Mes
+            <span className="hidden sm:inline">Generar Próximo Mes</span>
+            <span className="sm:hidden">Próximo Mes</span>
           </Button>
-          <Button onClick={() => handleOpenDialog()}>
-            <Plus className="mr-2 h-4 w-4" />
-            Nuevo Horario
+          <Button onClick={() => handleOpenDialog()} className="touch-target">
+            <Plus className="h-4 w-4 sm:mr-2" />
+            <span className="hidden sm:inline">Nuevo Horario</span>
+            <span className="sm:hidden">Nuevo</span>
           </Button>
         </div>
       </div>
@@ -640,7 +643,7 @@ export default function HorariosPage() {
 
       {/* Dialog de Crear/Editar Horario */}
       <Dialog open={showDialog} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>
               {selectedHorario ? "Editar Horario Recurrente" : "Nuevo Horario Recurrente"}
@@ -666,14 +669,15 @@ export default function HorariosPage() {
               </p>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            {/* Ruta y Embarcación: 2 columnas desde móviles normales (375px+) */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="rutaId">Ruta *</Label>
                 <select
                   id="rutaId"
                   value={formData.rutaId}
                   onChange={(e) => setFormData({ ...formData, rutaId: e.target.value })}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
                 >
                   <option value="">Selecciona una ruta</option>
                   {rutas.map((ruta) => (
@@ -692,7 +696,7 @@ export default function HorariosPage() {
                   onChange={(e) =>
                     setFormData({ ...formData, embarcacionId: e.target.value })
                   }
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
                 >
                   <option value="">Selecciona una embarcación</option>
                   {embarcaciones.map((embarcacion) => (
@@ -716,13 +720,13 @@ export default function HorariosPage() {
 
             <div className="space-y-2">
               <Label>Días de la Semana *</Label>
-              <div className="grid grid-cols-4 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {DIAS_SEMANA.map((dia) => (
                   <button
                     key={dia.valor}
                     type="button"
                     onClick={() => toggleDiaSemana(dia.valor)}
-                    className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                    className={`rounded-md border px-3 py-2 text-xs sm:text-sm font-medium transition-colors touch-target ${
                       formData.diasSemana.includes(dia.valor)
                         ? "bg-primary text-primary-foreground border-primary"
                         : "bg-background border-input hover:bg-muted"
@@ -749,11 +753,11 @@ export default function HorariosPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto touch-target">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto touch-target">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {selectedHorario ? "Actualizar" : "Crear"}
             </Button>
@@ -773,7 +777,8 @@ export default function HorariosPage() {
           </DialogHeader>
 
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            {/* Fecha Inicio y Fin: 2 columnas desde móviles normales (375px+) */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="fechaInicio">Fecha Inicio *</Label>
                 <Input
@@ -859,7 +864,7 @@ export default function HorariosPage() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -867,10 +872,11 @@ export default function HorariosPage() {
                 setSelectedHorario(null);
                 setProgresoGeneracionHorario(null);
               }}
+              className="w-full sm:w-auto touch-target"
             >
               Cancelar
             </Button>
-            <Button onClick={handleGenerateTrips} disabled={generating || !selectedHorario}>
+            <Button onClick={handleGenerateTrips} disabled={generating || !selectedHorario} className="w-full sm:w-auto touch-target">
               {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Generar Viajes
             </Button>
@@ -880,7 +886,7 @@ export default function HorariosPage() {
 
       {/* Dialog de Generar Próximo Mes */}
       <Dialog open={showGenerateNextMonthDialog} onOpenChange={setShowGenerateNextMonthDialog}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Generar Viajes del Próximo Mes</DialogTitle>
             <DialogDescription>
@@ -964,7 +970,7 @@ export default function HorariosPage() {
             )}
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
             <Button
               variant="outline"
               onClick={() => {
@@ -972,12 +978,14 @@ export default function HorariosPage() {
                 setSelectedHorariosNextMonth(new Set());
                 setProgresoGeneracionHorario(null);
               }}
+              className="w-full sm:w-auto touch-target"
             >
               Cancelar
             </Button>
             <Button
               onClick={handleGenerateNextMonth}
               disabled={generating || selectedHorariosNextMonth.size === 0}
+              className="w-full sm:w-auto touch-target"
             >
               {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Generar Viajes

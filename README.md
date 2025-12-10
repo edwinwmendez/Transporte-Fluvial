@@ -1,34 +1,92 @@
-# 🚢 Frontend - Sistema de Transporte Fluvial
+# Frontend - Sistema de Transporte Fluvial Atalaya
 
-Frontend del sistema de reservas de transporte fluvial construido con Next.js 16, TypeScript y Tailwind CSS.
+## 🎯 Características de Responsividad
 
-## 📱 Responsividad Completa
+Este proyecto está completamente optimizado para dispositivos móviles, tablets y desktop, siguiendo un enfoque **mobile-first**.
 
-Este proyecto está diseñado con **enfoque mobile-first** y es completamente responsive para:
-- 📱 **Móviles** (320px - 767px)
-- 📱 **Tablets** (768px - 1023px)
-- 💻 **Desktop** (1024px+)
+### Breakpoints Implementados
 
-### Características de Responsividad
+Según el PRD del proyecto:
 
-✅ **Mobile-First Design**: Diseñado primero para móvil, escalado a desktop  
-✅ **Touch Targets**: Mínimo 44x44px para elementos interactivos  
-✅ **Tipografía Adaptativa**: Tamaños de fuente que se ajustan por breakpoint  
-✅ **Layouts Flexibles**: Grid y Flex que se adaptan automáticamente  
-✅ **Safe Area Support**: Soporte para dispositivos con notch  
-✅ **Prevención de Zoom**: Inputs optimizados para iOS  
-✅ **Hooks Responsive**: Utilidades para detectar breakpoints
+- **Mobile**: 320px - 767px
+- **Tablet**: 768px - 1023px
+- **Desktop**: 1024px+
 
-Ver [RESPONSIVE-GUIDE.md](./RESPONSIVE-GUIDE.md) para documentación completa.
+### Características Principales
 
-## 🚀 Inicio Rápido
+#### 1. **Mobile-First Design**
+- Todos los componentes están diseñados primero para móviles
+- Se escalan progresivamente hacia tablets y desktop
+- Touch targets mínimos de 44x44px (accesibilidad)
 
-### Prerrequisitos
+#### 2. **Componentes Responsivos**
 
-- Node.js 20.x o superior
-- npm o yarn
+##### Navbar
+- Menú hamburguesa en móviles/tablets
+- Menú completo en desktop
+- Sticky header con soporte para safe areas (notches)
 
-### Instalación
+##### Sidebar
+- Overlay en móviles/tablets con animación slide-in
+- Sidebar fija en desktop
+- Cierre automático al hacer clic fuera en móviles
+
+##### SeatMap (Mapa de Asientos)
+- Tamaño de asientos adaptativo según tamaño de pantalla
+- Scroll horizontal y vertical en móviles
+- Grid responsivo que se adapta al espacio disponible
+- Información de ocupación visible en todos los tamaños
+
+##### TripCard
+- Grid responsivo: 1 columna en móvil, 2 en tablet, 3 en desktop
+- Texto y espaciado adaptativos
+- Botones con tamaño touch-friendly
+
+##### Formularios
+- Inputs con tamaño de fuente 16px en móviles (previene zoom en iOS)
+- Modales full-screen en móviles, modales centrados en desktop
+- Botones con tamaño mínimo de 44x44px
+
+#### 3. **Optimizaciones para Móviles**
+
+- **Safe Areas**: Soporte para notches y áreas seguras en iOS
+- **Touch Targets**: Todos los elementos interactivos tienen mínimo 44x44px
+- **Font Size**: 16px mínimo en inputs para prevenir zoom automático en iOS
+- **Scroll Smooth**: Scroll suave con `-webkit-overflow-scrolling: touch`
+- **Viewport**: Configurado correctamente para evitar problemas de zoom
+
+#### 4. **Utilidades Responsivas**
+
+El archivo `src/lib/utils/responsive.ts` proporciona:
+
+- `useBreakpoint()`: Hook para detectar el breakpoint actual
+- `isMobile()`, `isTablet()`, `isDesktop()`: Funciones de detección
+- `responsiveSpacing`: Clases predefinidas para espaciado
+- `responsiveGrid`: Clases predefinidas para grids
+
+### Estructura del Proyecto
+
+```
+frontend/
+├── src/
+│   ├── app/
+│   │   ├── (admin)/          # Layout administrativo
+│   │   │   ├── layout.tsx    # Layout con Navbar y Sidebar
+│   │   │   ├── dashboard/    # Página principal
+│   │   │   └── ventas/      # Página de ventas con SeatMap
+│   │   ├── globals.css      # Estilos globales con utilidades responsivas
+│   │   └── layout.tsx       # Root layout
+│   ├── components/
+│   │   ├── ui/              # Componentes base (Button, Card, Input, Dialog)
+│   │   ├── shared/          # Navbar, Sidebar
+│   │   └── admin/           # SeatMap, TripCard
+│   └── lib/
+│       └── utils/
+│           ├── cn.ts        # Utilidad para clases condicionales
+│           └── responsive.ts # Utilidades responsivas
+```
+
+### Instalación y Uso
 
 ```bash
 # Instalar dependencias
@@ -37,151 +95,37 @@ npm install
 # Ejecutar en desarrollo
 npm run dev
 
-# Construir para producción
+# Build para producción
 npm run build
 
-# Ejecutar producción
+# Iniciar producción
 npm start
 ```
 
-La aplicación estará disponible en `http://localhost:3000`
-
-## 📁 Estructura del Proyecto
-
-```
-frontend/
-├── src/
-│   ├── app/                    # App Router (Next.js 16)
-│   │   ├── (cliente)/          # Rutas de cliente
-│   │   ├── layout.tsx          # Layout principal
-│   │   ├── page.tsx            # Página de inicio
-│   │   └── globals.css         # Estilos globales
-│   ├── components/
-│   │   ├── shared/             # Componentes compartidos
-│   │   │   ├── Navbar.tsx      # Navbar responsive
-│   │   │   ├── Footer.tsx      # Footer responsive
-│   │   │   └── Container.tsx   # Contenedor responsive
-│   │   ├── ui/                 # Componentes UI base
-│   │   │   ├── Button.tsx      # Botón responsive
-│   │   │   ├── Card.tsx        # Card responsive
-│   │   │   └── Input.tsx       # Input responsive
-│   │   └── cliente/            # Componentes específicos
-│   │       ├── TripCard.tsx    # Card de viaje
-│   │       └── SearchFilters.tsx
-│   └── lib/
-│       └── utils/
-│           ├── cn.ts           # Helper para clases
-│           └── responsive.ts  # Hooks responsive
-├── tailwind.config.ts          # Configuración Tailwind
-├── next.config.js              # Configuración Next.js
-└── package.json
-```
-
-## 🎨 Componentes Responsive
-
-### Container
-
-Contenedor con padding adaptativo:
-
-```tsx
-<Container maxWidth="xl" padding>
-  {/* Contenido */}
-</Container>
-```
-
-### Button
-
-Botón con touch targets adecuados:
-
-```tsx
-<Button variant="primary" size="md" fullWidth>
-  Click me
-</Button>
-```
-
-### Card
-
-Card con padding adaptativo:
-
-```tsx
-<Card padding="md" hover>
-  <CardHeader>
-    <CardTitle>Título</CardTitle>
-  </CardHeader>
-  <CardContent>Contenido</CardContent>
-</Card>
-```
-
-## 🛠️ Hooks Responsive
-
-### useBreakpoint()
-
-Detecta el breakpoint actual:
-
-```tsx
-import { useBreakpoint } from '@/lib/utils/responsive';
-
-const breakpoint = useBreakpoint();
-```
-
-### useIsMobile(), useIsTablet(), useIsDesktop()
-
-Hooks de conveniencia:
-
-```tsx
-import { useIsMobile } from '@/lib/utils/responsive';
-
-const isMobile = useIsMobile();
-```
-
-## 📐 Breakpoints
-
-| Breakpoint | Tamaño | Uso |
-|------------|--------|-----|
-| `xs` | 320px | Móvil pequeño |
-| `sm` | 640px | Móvil grande |
-| `md` | 768px | Tablet |
-| `lg` | 1024px | Desktop pequeño |
-| `xl` | 1280px | Desktop |
-| `2xl` | 1536px | Desktop grande |
-
-## 🎯 Mejores Prácticas
-
-1. **Siempre usar mobile-first**: Diseña primero para móvil
-2. **Touch targets**: Mínimo 44x44px para elementos interactivos
-3. **Tipografía**: Usar tamaños responsive definidos en `globals.css`
-4. **Grid/Flex**: Usar clases responsive de Tailwind
-5. **Testing**: Probar en diferentes tamaños de pantalla
-
-## 📚 Documentación
-
-- [Guía de Responsividad](./RESPONSIVE-GUIDE.md) - Guía completa de responsividad
-- [Next.js Docs](https://nextjs.org/docs) - Documentación de Next.js
-- [Tailwind CSS](https://tailwindcss.com/docs) - Documentación de Tailwind
-
-## 🧪 Testing Responsive
+### Testing de Responsividad
 
 Para probar la responsividad:
 
-1. **DevTools**: Usar herramientas de desarrollador del navegador
-2. **Dispositivos reales**: Probar en móviles y tablets reales
-3. **Breakpoints**: Verificar cada breakpoint definido
+1. **Chrome DevTools**: Usa el modo responsive y prueba diferentes dispositivos
+2. **Breakpoints a probar**:
+   - 320px (iPhone SE)
+   - 375px (iPhone 12/13)
+   - 768px (iPad)
+   - 1024px (Desktop pequeño)
+   - 1280px+ (Desktop grande)
 
-## 🐛 Problemas Comunes
+3. **Funcionalidades a verificar**:
+   - ✅ Navbar se adapta correctamente
+   - ✅ Sidebar funciona en móvil y desktop
+   - ✅ SeatMap es usable en móviles pequeños
+   - ✅ Formularios no causan zoom en iOS
+   - ✅ Touch targets son suficientemente grandes
+   - ✅ Texto es legible en todos los tamaños
 
-### Zoom automático en iOS
-**Solución**: Inputs deben tener `font-size: 16px` mínimo
+### Mejoras Futuras
 
-### Overflow horizontal
-**Solución**: Usar `max-w-full` y contenedores apropiados
-
-### Touch targets pequeños
-**Solución**: Usar clase `touch-target` o mínimo `min-h-[44px]`
-
-## 📝 Licencia
-
-Este proyecto es parte del Sistema de Transporte Fluvial Atalaya.
-
----
-
-**Desarrollado con ❤️ para la Amazonía peruana**
+- [ ] PWA completo con service workers
+- [ ] Modo offline para ventas
+- [ ] Optimización de imágenes responsivas
+- [ ] Lazy loading de componentes pesados
+- [ ] Testing automatizado de responsividad

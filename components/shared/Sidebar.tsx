@@ -43,35 +43,47 @@ const navItems: NavItem[] = [
  */
 export function Sidebar() {
   const [isOpen, setIsOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const pathname = usePathname();
   const isMobile = useIsMobile();
 
+  // Marcar como montado después de la hidratación
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   // Cerrar sidebar en móvil cuando cambia la ruta
   useEffect(() => {
-    if (isMobile && isOpen) {
-      setIsOpen(false);
+    if (mounted && isOpen) {
+      // Solo cerrar en móvil (verificamos con window.innerWidth)
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        setIsOpen(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname]); // Solo cerrar cuando cambia la ruta, no cuando cambia isOpen
+  }, [pathname, mounted]); // Solo cerrar cuando cambia la ruta, no cuando cambia isOpen
 
   // Prevenir scroll del body cuando el sidebar está abierto en móvil
   useEffect(() => {
-    if (isMobile && isOpen) {
-      document.body.style.overflow = 'hidden';
+    if (mounted && isOpen) {
+      // Solo prevenir scroll en móvil
+      if (typeof window !== 'undefined' && window.innerWidth < 768) {
+        document.body.style.overflow = 'hidden';
+      }
     } else {
       document.body.style.overflow = '';
     }
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isMobile, isOpen]);
+  }, [mounted, isOpen]);
 
   const toggleSidebar = (e?: React.MouseEvent) => {
     e?.stopPropagation();
     setIsOpen(prev => !prev);
   };
   
-  const closeSidebar = (e?: React.MouseEvent) => {
+  const closeSidebar = (e?: React.MouseEvent | React.TouchEvent) => {
     e?.stopPropagation();
     setIsOpen(false);
   };
@@ -88,31 +100,31 @@ export function Sidebar() {
 
   return (
     <>
-      {/* Botón hamburguesa - Solo visible en móvil */}
-      {isMobile && (
-        <button
-          onClick={toggleSidebar}
-          className="fixed top-4 left-4 z-50 p-2 rounded-lg bg-card border border-border shadow-lg touch-target"
-          aria-label="Toggle menu"
-          aria-expanded={isOpen}
-        >
-          {isOpen ? (
-            <X className="h-6 w-6" />
-          ) : (
-            <Menu className="h-6 w-6" />
-          )}
-        </button>
-      )}
+      {/* Botón hamburguesa - Solo visible en móvil cuando el sidebar está cerrado */}
+      <button
+        onClick={toggleSidebar}
+        className={cn(
+          "fixed top-4 left-4 z-50 p-2 rounded-lg bg-card border border-border shadow-lg touch-target",
+          "md:hidden", // Oculto en desktop con CSS
+          (!mounted || isOpen) && "hidden" // Oculto si no está montado o si el sidebar está abierto
+        )}
+        aria-label="Toggle menu"
+        aria-expanded={isOpen}
+      >
+        <Menu className="h-6 w-6" />
+      </button>
 
-      {/* Overlay - Solo en móvil cuando está abierto */}
-      {isMobile && isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 transition-opacity animate-in fade-in duration-200"
-          onClick={closeSidebar}
-          onTouchStart={closeSidebar}
-          aria-hidden="true"
-        />
-      )}
+      {/* Overlay - Solo en móvil cuando está abierto (usando CSS para evitar hydration mismatch) */}
+      <div
+        className={cn(
+          "fixed inset-0 bg-black/50 z-40 transition-opacity animate-in fade-in duration-200",
+          "md:hidden", // Oculto en desktop con CSS
+          (!mounted || !isOpen) && "hidden" // Oculto si no está montado o no está abierto
+        )}
+        onClick={closeSidebar}
+        onTouchStart={closeSidebar}
+        aria-hidden="true"
+      />
 
       {/* Sidebar */}
       <aside
@@ -120,9 +132,10 @@ export function Sidebar() {
           'fixed md:static inset-y-0 left-0 z-40',
           'w-64 border-r bg-card shadow-lg md:shadow-none',
           'transform transition-transform duration-300 ease-in-out',
-          // En móvil: se desliza desde la izquierda
-          isMobile && (isOpen ? 'translate-x-0' : '-translate-x-full'),
-          // En desktop: siempre visible
+          // En móvil: se desliza desde la izquierda cuando está cerrado
+          // Usamos una clase condicional solo después de montar para evitar hydration mismatch
+          mounted && !isOpen && '-translate-x-full md:translate-x-0',
+          // En desktop: siempre visible (md:translate-x-0 se aplica siempre)
           'md:translate-x-0'
         )}
         onClick={(e) => e.stopPropagation()}
@@ -137,16 +150,18 @@ export function Sidebar() {
                 <span className="sm:hidden">TF</span>
               </span>
             </div>
-            {/* Botón cerrar solo en móvil */}
-            {isMobile && (
-              <button
-                onClick={closeSidebar}
-                className="p-1 rounded-lg hover:bg-muted touch-target"
-                aria-label="Cerrar menú"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            )}
+            {/* Botón cerrar solo en móvil (usando CSS para evitar hydration mismatch) */}
+            <button
+              onClick={closeSidebar}
+              className={cn(
+                "p-1 rounded-lg hover:bg-muted touch-target",
+                "md:hidden", // Oculto en desktop con CSS
+                !mounted && "invisible" // Invisible hasta que se monte
+              )}
+              aria-label="Cerrar menú"
+            >
+              <X className="h-5 w-5" />
+            </button>
           </div>
 
           {/* Navegación */}
