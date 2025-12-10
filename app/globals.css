@@ -149,23 +149,3 @@ body {
   background-size: 20px 20px;
 }
 
-/* Diálogos responsivos: eliminar espacio extra en móvil */
-@media (max-width: 639px) {
-  /* Hacer que el contenido principal (no footer) sea scrolleable */
-  [role="dialog"] > div:not(:last-child) {
-    flex: 1 1 auto;
-    min-height: 0;
-    overflow-y: auto;
-  }
-  
-  /* Asegurar que el footer se quede abajo sin espacio extra */
-  [role="dialog"] > div:last-child {
-    margin-top: auto;
-    flex-shrink: 0;
-  }
-  
-  /* Ajustar el padding del contenido scrolleable */
-  [role="dialog"] > div:not(:last-child) {
-    padding-bottom: 0.5rem;
-  }
-}

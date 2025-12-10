@@ -40,14 +40,11 @@ const DialogContent = React.forwardRef<
         // Móvil: Full screen con flexbox para distribución correcta
         "inset-0 max-h-screen flex flex-col rounded-none",
         // Desktop: Modal centrado - resetear inset y centrar correctamente
-        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:flex-none sm:grid sm:gap-4",
+        "sm:inset-auto sm:left-1/2 sm:top-1/2 sm:-translate-x-1/2 sm:-translate-y-1/2 sm:max-w-lg sm:max-h-[90vh] sm:rounded-lg sm:flex-none",
         // Permitir sobrescribir max-w con clases como max-w-2xl
         "[&.max-w-2xl]:sm:max-w-2xl [&.max-w-xl]:sm:max-w-xl",
         // Padding responsivo
         "p-4 sm:p-6",
-        // En móvil: hacer que el contenido principal (divs que no son footer) sea scrolleable
-        "[&>div:not(:last-of-type)]:flex-1 [&>div:not(:last-of-type)]:min-h-0 [&>div:not(:last-of-type)]:overflow-y-auto",
-        "sm:[&>div:not(:last-of-type)]:flex-none sm:[&>div:not(:last-of-type)]:overflow-visible",
         // Animaciones
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         // Animaciones desktop (slide/zoom)

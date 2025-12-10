@@ -433,16 +433,16 @@ export function QuickSaleModal({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-border bg-background max-h-[90vh] flex flex-col">
-        {/* Header limpio - SIN gradiente */}
-        <div className="border-b border-border p-6 bg-muted/30">
+      <DialogContent className="sm:max-w-[550px] p-0 overflow-hidden border-border bg-background max-h-[90vh] flex flex-col [&>div:first-child]:flex-shrink-0">
+        {/* Header limpio - SIN gradiente - flex-shrink-0 para evitar expansión */}
+        <div className="border-b border-border p-4 sm:p-6 bg-muted/30 flex-shrink-0">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-semibold flex items-center gap-2">
-              <Ticket className="w-6 h-6 text-primary" />
+            <DialogTitle className="text-xl sm:text-2xl font-semibold flex items-center gap-2">
+              <Ticket className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
               Emisión de Boleto
             </DialogTitle>
-            <DialogDescription className="mt-2 flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
+            <DialogDescription className="mt-1 sm:mt-2 flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
                 ASIENTO {seat.numeroAsiento}
               </span>
             </DialogDescription>
@@ -450,7 +450,7 @@ export function QuickSaleModal({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
-          <div className="p-6 space-y-5 overflow-y-auto flex-1">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto max-h-[calc(90vh-12rem)] sm:max-h-none">
             <div className="grid grid-cols-2 gap-4">
               {/* DNI */}
               <div className="space-y-2">
@@ -672,7 +672,7 @@ export function QuickSaleModal({
             )}
           </div>
 
-          <DialogFooter className="p-6 bg-muted/30 border-t border-border flex-shrink-0">
+          <DialogFooter className="p-4 sm:p-6 bg-muted/30 border-t border-border flex-shrink-0">
             <Button
               type="button"
               variant="outline"
