@@ -135,6 +135,48 @@ export interface Booking {
 }
 
 // ============================================================================
+// HELPERS DE FECHAS
+// ============================================================================
+
+/**
+ * Convierte un string de fecha (YYYY-MM-DD) a Date en hora local medianoche
+ *
+ * IMPORTANTE: Evita problemas de zona horaria al interpretar strings como UTC.
+ * new Date("2026-01-01") interpreta como UTC, lo que causa desfases.
+ * Esta función crea la fecha en la timezone local del usuario.
+ *
+ * @param dateString String en formato YYYY-MM-DD (de input type="date")
+ * @returns Date en hora local medianoche (00:00:00.000)
+ *
+ * @example
+ * // Usuario en Perú (UTC-5)
+ * new Date("2026-01-01") // → 2025-12-31T19:00:00-05:00 (INCORRECTO)
+ * parseLocalDate("2026-01-01") // → 2026-01-01T00:00:00-05:00 (CORRECTO)
+ */
+export function parseLocalDate(dateString: string): Date {
+  const [year, month, day] = dateString.split('-').map(Number);
+  // Crear fecha en hora local (mes es 0-indexed en JavaScript)
+  return new Date(year, month - 1, day, 0, 0, 0, 0);
+}
+
+/**
+ * Convierte una fecha a string YYYY-MM-DD usando hora LOCAL
+ * Evita problemas de timezone al usar toISOString() que devuelve UTC
+ * 
+ * @example
+ * // Usuario en Perú (UTC-5)
+ * const fecha = new Date(2026, 0, 1, 0, 0, 0, 0); // 2026-01-01 00:00:00 local
+ * fecha.toISOString().split('T')[0] // → "2025-12-31" (INCORRECTO, usa UTC)
+ * formatLocalDate(fecha) // → "2026-01-01" (CORRECTO, usa hora local)
+ */
+export function formatLocalDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+// ============================================================================
 // VALIDACIONES DE DATOS
 // ============================================================================
 
@@ -211,19 +253,93 @@ export async function getTripsForTodayAndTomorrow(): Promise<Trip[]> {
   tomorrow.setDate(tomorrow.getDate() + 1);
   tomorrow.setHours(23, 59, 59, 999);
 
-  const viajesRef = collection(db, 'viajes');
-  const q = query(
-    viajesRef,
-    where('fechaSalida', '>=', Timestamp.fromDate(today)),
-    where('fechaSalida', '<=', Timestamp.fromDate(tomorrow)),
-    where('estado', '==', 'programado')
-  );
+  return getTripsByDateRange(today, tomorrow, ['programado']);
+}
 
-  const snapshot = await getDocs(q);
-  return snapshot.docs.map((doc) => ({
-    id: doc.id,
-    ...doc.data(),
-  })) as Trip[];
+/**
+ * Obtiene viajes en un rango de fechas con filtros opcionales de estado
+ * @param fechaInicio Fecha de inicio del rango
+ * @param fechaFin Fecha de fin del rango
+ * @param estados Array de estados a filtrar (opcional, si no se especifica trae todos)
+ * @returns Array de viajes que cumplen con los criterios
+ */
+export async function getTripsByDateRange(
+  fechaInicio: Date,
+  fechaFin: Date,
+  estados?: Trip['estado'][]
+): Promise<Trip[]> {
+  try {
+    // Asegurar que las fechas tengan las horas correctas
+    const inicio = new Date(fechaInicio);
+    inicio.setHours(0, 0, 0, 0);
+
+    const fin = new Date(fechaFin);
+    fin.setHours(23, 59, 59, 999);
+
+    const viajesRef = collection(db, 'viajes');
+    let q = query(
+      viajesRef,
+      where('fechaSalida', '>=', Timestamp.fromDate(inicio)),
+      where('fechaSalida', '<=', Timestamp.fromDate(fin))
+    );
+
+    // Si se especifican estados, filtrar por ellos
+    if (estados && estados.length > 0) {
+      if (estados.length === 1) {
+        q = query(q, where('estado', '==', estados[0]));
+      } else {
+        // Si hay múltiples estados, necesitamos hacer múltiples consultas
+        // o usar 'in' si Firestore lo soporta (solo hasta 10 valores)
+        if (estados.length <= 10) {
+          q = query(q, where('estado', 'in', estados));
+        } else {
+          // Si hay más de 10 estados, hacer múltiples consultas
+          const resultados: Trip[] = [];
+          for (let i = 0; i < estados.length; i += 10) {
+            const estadosLote = estados.slice(i, i + 10);
+            const qLote = query(
+              viajesRef,
+              where('fechaSalida', '>=', Timestamp.fromDate(inicio)),
+              where('fechaSalida', '<=', Timestamp.fromDate(fin)),
+              where('estado', 'in', estadosLote)
+            );
+            const snapshotLote = await getDocs(qLote);
+            const viajesLote = snapshotLote.docs.map((doc) => ({
+              id: doc.id,
+              ...doc.data(),
+            })) as Trip[];
+            resultados.push(...viajesLote);
+          }
+          // Eliminar duplicados por ID
+          const unicos = new Map<string, Trip>();
+          resultados.forEach((viaje) => {
+            unicos.set(viaje.id, viaje);
+          });
+          return Array.from(unicos.values()).sort((a, b) => {
+            const fechaA = a.fechaSalida?.toDate ? a.fechaSalida.toDate() : (a.fechaSalida instanceof Timestamp ? a.fechaSalida.toDate() : new Date(String(a.fechaSalida)));
+            const fechaB = b.fechaSalida?.toDate ? b.fechaSalida.toDate() : (b.fechaSalida instanceof Timestamp ? b.fechaSalida.toDate() : new Date(String(b.fechaSalida)));
+            return fechaA.getTime() - fechaB.getTime();
+          });
+        }
+      }
+    }
+
+    const snapshot = await getDocs(q);
+    const viajes = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Trip[];
+
+    // Ordenar por fecha de salida
+    return viajes.sort((a, b) => {
+      const fechaA = a.fechaSalida?.toDate ? a.fechaSalida.toDate() : (a.fechaSalida instanceof Timestamp ? a.fechaSalida.toDate() : new Date(String(a.fechaSalida)));
+      const fechaB = b.fechaSalida?.toDate ? b.fechaSalida.toDate() : (b.fechaSalida instanceof Timestamp ? b.fechaSalida.toDate() : new Date(String(b.fechaSalida)));
+      return fechaA.getTime() - fechaB.getTime();
+    });
+  } catch (error) {
+    console.error('Error al obtener viajes por rango de fechas:', error);
+    throw error;
+  }
 }
 
 // Helper: Obtener asientos de un viaje
@@ -1349,16 +1465,71 @@ export async function deleteHorarioRecurrente(horarioId: string): Promise<void> 
 // ============================================================================
 
 /**
+ * Calcula cuántos viajes se generarían desde un horario recurrente sin generarlos
+ * @param horarioId ID del horario recurrente
+ * @param fechaInicio Fecha de inicio del rango
+ * @param fechaFin Fecha de fin del rango
+ * @returns Número de viajes que se generarían
+ */
+export async function calcularViajesDesdeHorario(
+  horarioId: string,
+  fechaInicio: Date,
+  fechaFin: Date
+): Promise<number> {
+  try {
+    const horarioRef = doc(db, 'horariosRecurrentes', horarioId);
+    const horarioSnap = await getDoc(horarioRef);
+
+    if (!horarioSnap.exists()) {
+      return 0;
+    }
+
+    const horario = horarioSnap.data() as HorarioRecurrente;
+
+    if (!horario.activo) {
+      return 0;
+    }
+
+    // Calcular todas las fechas que coinciden con los días de la semana
+    const fechas = obtenerFechasPorDiasSemana(
+      fechaInicio,
+      fechaFin,
+      horario.diasSemana
+    );
+
+    // Verificar qué viajes ya existen
+    const viajesExistentes = await verificarViajesExistentes(
+      horario.rutaId,
+      horario.embarcacionId,
+      horario.horaSalida,
+      fechas
+    );
+
+    // Filtrar fechas que no tienen viaje existente
+    const fechasParaCrear = fechas.filter(
+      (fecha) => !viajesExistentes.has(formatLocalDate(fecha))
+    );
+
+    return fechasParaCrear.length;
+  } catch (error) {
+    console.error('Error al calcular viajes desde horario:', error);
+    return 0;
+  }
+}
+
+/**
  * Genera viajes automáticamente desde un horario recurrente para un rango de fechas
  * @param horarioId ID del horario recurrente
  * @param fechaInicio Fecha de inicio del rango
  * @param fechaFin Fecha de fin del rango
+ * @param onProgress Callback opcional que se llama cada vez que se crea un viaje (viajeCreado, total)
  * @returns Array con los IDs de los viajes creados
  */
 export async function generarViajesDesdeHorario(
   horarioId: string,
   fechaInicio: Date,
-  fechaFin: Date
+  fechaFin: Date,
+  onProgress?: (viajeCreado: number, total: number) => void
 ): Promise<string[]> {
   try {
     // Obtener el horario recurrente
@@ -1398,24 +1569,31 @@ export async function generarViajesDesdeHorario(
 
     // Filtrar fechas que no tienen viaje existente
     const fechasParaCrear = fechas.filter(
-      (fecha) => !viajesExistentes.has(fecha.toISOString().split('T')[0])
+      (fecha) => !viajesExistentes.has(formatLocalDate(fecha))
     );
 
     if (fechasParaCrear.length === 0) {
       return []; // Todos los viajes ya existen
     }
 
-    // Crear viajes en lotes
+    const total = fechasParaCrear.length;
     const viajesCreados: string[] = [];
-    const batchSize = 10; // Crear 10 viajes por vez para no sobrecargar
 
-    for (let i = 0; i < fechasParaCrear.length; i += batchSize) {
-      const lote = fechasParaCrear.slice(i, i + batchSize);
-      const promesas = lote.map((fecha) =>
-        crearViajeDesdeHorario(horario, embarcacion, fecha)
-      );
-      const resultados = await Promise.all(promesas);
-      viajesCreados.push(...resultados);
+    // Crear viajes uno por uno para reportar progreso en tiempo real
+    for (let i = 0; i < fechasParaCrear.length; i++) {
+      const fecha = fechasParaCrear[i];
+      try {
+        const viajeId = await crearViajeDesdeHorario(horario, embarcacion, fecha);
+        viajesCreados.push(viajeId);
+        
+        // Reportar progreso después de cada viaje creado
+        if (onProgress) {
+          onProgress(viajesCreados.length, total);
+        }
+      } catch (error) {
+        console.error(`Error al crear viaje para fecha ${fecha.toISOString()}:`, error);
+        // Continuar con el siguiente viaje aunque falle uno
+      }
     }
 
     return viajesCreados;
@@ -1430,7 +1608,9 @@ export async function generarViajesDesdeHorario(
 
 /**
  * Obtiene todas las fechas en un rango que coinciden con los días de la semana especificados
- * Usa UTC para evitar problemas de zona horaria
+ *
+ * IMPORTANTE: Mantiene timezone local del usuario para evitar desfases.
+ * Las fechas de inicio/fin vienen de inputs type="date" que son locales.
  */
 function obtenerFechasPorDiasSemana(
   inicio: Date,
@@ -1439,29 +1619,26 @@ function obtenerFechasPorDiasSemana(
 ): Date[] {
   const fechas: Date[] = [];
 
-  // Convertir a UTC para evitar problemas de zona horaria
-  // Perú está en UTC-5 (America/Lima)
-  const fechaActual = new Date(Date.UTC(
-    inicio.getFullYear(),
-    inicio.getMonth(),
-    inicio.getDate(),
-    0, 0, 0, 0
-  ));
+  // Crear copia de la fecha de inicio y normalizar a medianoche LOCAL
+  const fechaActual = new Date(inicio);
+  fechaActual.setHours(0, 0, 0, 0);
 
-  const fechaFin = new Date(Date.UTC(
-    fin.getFullYear(),
-    fin.getMonth(),
-    fin.getDate(),
-    23, 59, 59, 999
-  ));
+  // Crear copia de la fecha de fin y normalizar a fin del día LOCAL
+  const fechaFin = new Date(fin);
+  fechaFin.setHours(23, 59, 59, 999);
 
   while (fechaActual <= fechaFin) {
-    const diaSemana = fechaActual.getUTCDay(); // 0=Domingo, 1=Lunes, ..., 6=Sábado
+    // getDay() devuelve el día de la semana en timezone LOCAL
+    // 0=Domingo, 1=Lunes, 2=Martes, 3=Miércoles, 4=Jueves, 5=Viernes, 6=Sábado
+    const diaSemana = fechaActual.getDay();
+
     if (diasSemana.includes(diaSemana)) {
+      // Crear copia de la fecha para agregar al array
       fechas.push(new Date(fechaActual));
     }
-    // Incrementar día usando UTC
-    fechaActual.setUTCDate(fechaActual.getUTCDate() + 1);
+
+    // Incrementar un día en timezone LOCAL
+    fechaActual.setDate(fechaActual.getDate() + 1);
   }
 
   return fechas;
@@ -1507,7 +1684,7 @@ async function verificarViajesExistentes(
       if (viaje.fechaSalida) {
         // Timestamp de Firestore siempre tiene .toDate()
         const fechaViaje = viaje.fechaSalida.toDate();
-        const fechaStr = fechaViaje.toISOString().split('T')[0];
+        const fechaStr = formatLocalDate(fechaViaje);
         viajesExistentes.add(fechaStr);
       }
     });

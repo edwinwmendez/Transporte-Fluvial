@@ -10,9 +10,11 @@ import { db } from './firebase';
  *
  * @returns Número de boleto único
  */
+import { formatLocalDate } from './firestore-helpers';
+
 export async function generateTicketNumber(): Promise<string> {
   const hoy = new Date();
-  const fechaStr = hoy.toISOString().split('T')[0].replace(/-/g, ''); // YYYYMMDD
+  const fechaStr = formatLocalDate(hoy).replace(/-/g, ''); // YYYYMMDD usando hora local
   const prefijo = `TKT-${fechaStr}-`;
 
   try {
