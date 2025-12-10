@@ -165,16 +165,17 @@ export default function EmbarcacionesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Gestión de Embarcaciones</h1>
-          <p className="text-muted-foreground mt-2">
+          <h1 className="text-2xl sm:text-3xl font-bold">Gestión de Embarcaciones</h1>
+          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
             Administra las embarcaciones y su configuración de asientos
           </p>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="mr-2 h-4 w-4" />
-          Nueva Embarcación
+        <Button onClick={() => handleOpenDialog()} className="touch-target">
+          <Plus className="h-4 w-4 sm:mr-2" />
+          <span className="hidden sm:inline">Nueva Embarcación</span>
+          <span className="sm:hidden">Nueva</span>
         </Button>
       </div>
 
@@ -278,7 +279,8 @@ export default function EmbarcacionesPage() {
               />
             </div>
 
-            <div className="grid grid-cols-3 gap-4">
+            {/* Filas, Columnas, Capacidad: 2 columnas en móvil normal, 3 en tablet+ */}
+            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="filas">Filas *</Label>
                 <Input
@@ -363,11 +365,11 @@ export default function EmbarcacionesPage() {
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={handleCloseDialog}>
+          <DialogFooter className="flex-col sm:flex-row gap-2">
+            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto touch-target">
               Cancelar
             </Button>
-            <Button onClick={handleSubmit} disabled={saving}>
+            <Button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto touch-target">
               {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {editingVessel ? "Actualizar" : "Crear"}
             </Button>
