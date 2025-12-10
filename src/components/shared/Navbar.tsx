@@ -1,109 +1,62 @@
-'use client';
+"use client"
 
-import { useState } from 'react';
-import Link from 'next/link';
-import { Menu, X } from 'lucide-react';
-import { cn } from '@/lib/utils/cn';
-import { useIsMobile } from '@/lib/utils/responsive';
+import * as React from "react"
+import { Menu, X } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils/cn"
 
 interface NavbarProps {
-  className?: string;
+  onMenuClick?: () => void
+  isMenuOpen?: boolean
+  title?: string
 }
 
-/**
- * Navbar responsive
- * Se adapta a móvil (menú hamburguesa) y desktop (menú horizontal)
- */
-export function Navbar({ className }: NavbarProps) {
-  const [isOpen, setIsOpen] = useState(false);
-  const isMobile = useIsMobile();
-
-  const toggleMenu = () => setIsOpen(!isOpen);
-
+export function Navbar({ onMenuClick, isMenuOpen = false, title = "Transporte Fluvial" }: NavbarProps) {
   return (
-    <nav
-      className={cn(
-        'w-full bg-white border-b border-gray-200 sticky top-0 z-50',
-        'safe-area-top',
-        className
-      )}
-    >
+    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 safe-top">
       <div className="container-responsive">
-        <div className="flex items-center justify-between h-16 md:h-20">
-          {/* Logo */}
-          <Link
-            href="/"
-            className="flex items-center space-x-2 text-xl md:text-2xl font-bold text-primary"
-          >
-            <span>🚢</span>
-            <span className="hidden sm:inline">Transporte Fluvial</span>
-            <span className="sm:hidden">TF</span>
-          </Link>
-
-          {/* Desktop Menu */}
-          <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
-            <Link
-              href="/buscar"
-              className="text-text-primary hover:text-primary transition-colors text-sm lg:text-base"
-            >
-              Buscar Viajes
-            </Link>
-            <Link
-              href="/reservas"
-              className="text-text-primary hover:text-primary transition-colors text-sm lg:text-base"
-            >
-              Mis Reservas
-            </Link>
-            <Link
-              href="/login"
-              className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm lg:text-base touch-target"
-            >
-              Iniciar Sesión
-            </Link>
-          </div>
-
-          {/* Mobile Menu Button */}
-          <button
-            onClick={toggleMenu}
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors touch-target"
-            aria-label="Toggle menu"
-            aria-expanded={isOpen}
-          >
-            {isOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
+        <div className="flex h-14 sm:h-16 items-center justify-between">
+          {/* Logo/Título - Responsive */}
+          <div className="flex items-center gap-2 sm:gap-4">
+            {onMenuClick && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="lg:hidden touch-target"
+                onClick={onMenuClick}
+                aria-label={isMenuOpen ? "Cerrar menú" : "Abrir menú"}
+              >
+                {isMenuOpen ? (
+                  <X className="h-5 w-5 sm:h-6 sm:w-6" />
+                ) : (
+                  <Menu className="h-5 w-5 sm:h-6 sm:w-6" />
+                )}
+              </Button>
             )}
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {isMobile && isOpen && (
-          <div className="md:hidden border-t border-gray-200 py-4 space-y-4">
-            <Link
-              href="/buscar"
-              onClick={() => setIsOpen(false)}
-              className="block text-text-primary hover:text-primary transition-colors py-2 touch-target"
-            >
-              Buscar Viajes
-            </Link>
-            <Link
-              href="/reservas"
-              onClick={() => setIsOpen(false)}
-              className="block text-text-primary hover:text-primary transition-colors py-2 touch-target"
-            >
-              Mis Reservas
-            </Link>
-            <Link
-              href="/login"
-              onClick={() => setIsOpen(false)}
-              className="block w-full text-center px-4 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors touch-target"
-            >
-              Iniciar Sesión
-            </Link>
+            <h1 className="text-lg sm:text-xl font-bold text-primary">
+              {title}
+            </h1>
           </div>
-        )}
+
+          {/* Acciones - Ocultas en móvil, visibles en desktop */}
+          <div className="hidden lg:flex items-center gap-4">
+            <Button variant="ghost" size="sm">
+              Perfil
+            </Button>
+            <Button variant="outline" size="sm">
+              Salir
+            </Button>
+          </div>
+
+          {/* Menú móvil - Botón de acciones */}
+          <div className="lg:hidden">
+            <Button variant="ghost" size="icon" className="touch-target">
+              <span className="sr-only">Menú</span>
+              <Menu className="h-5 w-5" />
+            </Button>
+          </div>
+        </div>
       </div>
     </nav>
-  );
+  )
 }

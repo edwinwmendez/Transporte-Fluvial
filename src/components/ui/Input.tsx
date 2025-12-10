@@ -1,55 +1,28 @@
-'use client';
+import * as React from "react"
+import { cn } from "@/lib/utils/cn"
 
-import { InputHTMLAttributes, forwardRef } from 'react';
-import { cn } from '@/lib/utils/cn';
+export interface InputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {}
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
-  label?: string;
-  error?: string;
-  helperText?: string;
-}
-
-/**
- * Input component responsive
- * Asegura tamaño de fuente adecuado para prevenir zoom en iOS
- */
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, helperText, className, ...props }, ref) => {
+const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ className, type, ...props }, ref) => {
     return (
-      <div className="w-full">
-        {label && (
-          <label
-            htmlFor={props.id}
-            className="block text-sm md:text-base font-medium text-text-primary mb-2"
-          >
-            {label}
-            {props.required && <span className="text-error ml-1">*</span>}
-          </label>
+      <input
+        type={type}
+        className={cn(
+          "flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50",
+          // Responsive: tamaño de fuente más grande en móviles para evitar zoom
+          "text-base sm:text-sm",
+          // Touch target mínimo
+          "touch-target",
+          className
         )}
-        <input
-          ref={ref}
-          className={cn(
-            'w-full px-4 py-3 md:py-3.5',
-            'text-base md:text-base', // 16px para prevenir zoom en iOS
-            'border border-gray-300 rounded-lg',
-            'focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent',
-            'disabled:bg-gray-100 disabled:cursor-not-allowed',
-            'placeholder:text-gray-400',
-            'touch-target',
-            error && 'border-error focus:ring-error',
-            className
-          )}
-          {...props}
-        />
-        {error && (
-          <p className="mt-1.5 text-sm text-error">{error}</p>
-        )}
-        {helperText && !error && (
-          <p className="mt-1.5 text-sm text-text-secondary">{helperText}</p>
-        )}
-      </div>
-    );
+        ref={ref}
+        {...props}
+      />
+    )
   }
-);
+)
+Input.displayName = "Input"
 
-Input.displayName = 'Input';
+export { Input }
