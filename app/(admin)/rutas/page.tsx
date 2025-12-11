@@ -1,28 +1,28 @@
 'use client';
 
+import { Loader2, Route as RouteIcon } from 'lucide-react';
 import { useState } from 'react';
-import { useRoutes, useCreateRoute, useUpdateRoute, useDeleteRoute } from '@/lib/hooks/useRoutes';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useDeleteRoute, useRoutes } from '@/lib/hooks/useRoutes';
+import { useToast } from '@/lib/hooks/useToast';
 import type { Route } from '@/lib/types';
+import { handleError } from '@/lib/utils/error-handler';
+
+import { RutaFormDialog } from './components/RutaFormDialog';
 import { RutasList } from './components/RutasList';
 import { RutasToolbar } from './components/RutasToolbar';
-import { RutaFormDialog } from './components/RutaFormDialog';
-import { Card, CardContent } from '@/components/ui/card';
-import { Route as RouteIcon, Loader2 } from 'lucide-react';
-import { useToast } from '@/lib/hooks/useToast';
-import { handleError } from '@/lib/utils/error-handler';
-import { Button } from '@/components/ui/button';
 
 /**
  * Página de administración de rutas
- * 
+ *
  * Permite crear, editar y eliminar rutas de transporte fluvial.
  * Incluye soporte para paradas intermedias.
  */
 export default function RutasPage() {
   const toast = useToast();
   const { data: rutas = [], isLoading: loadingRutas, refetch: refetchRutas } = useRoutes();
-  // const createRoute = useCreateRoute();
-  // const updateRoute = useUpdateRoute();
   const deleteRoute = useDeleteRoute();
 
   const [showDialog, setShowDialog] = useState(false);

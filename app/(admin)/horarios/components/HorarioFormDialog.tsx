@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,13 +12,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
-import type { HorarioRecurrente, Route, Vessel } from '@/lib/types';
 import { useCreateHorario, useUpdateHorario } from '@/lib/hooks/useSchedules';
 import { useToast } from '@/lib/hooks/useToast';
+import type { HorarioRecurrente, Route, Vessel } from '@/lib/types';
 import { logError } from '@/lib/utils/logger';
 
 const DIAS_SEMANA = [
@@ -52,37 +53,28 @@ export function HorarioFormDialog({
   const createHorario = useCreateHorario();
   const updateHorario = useUpdateHorario();
 
-  const [formData, setFormData] = useState({
-    nombre: '',
-    rutaId: '',
-    embarcacionId: '',
-    horaSalida: '',
-    diasSemana: [] as number[],
-    activo: true,
-  });
-
-  useEffect(() => {
+  // Inicializar formData basado en horario usando función inicializadora
+  // El key prop en Dialog fuerza remount cuando cambia horario, así que esto solo se ejecuta una vez
+  const [formData, setFormData] = useState(() => {
     if (horario) {
-      setFormData({
+      return {
         nombre: horario.nombre,
         rutaId: horario.rutaId,
         embarcacionId: horario.embarcacionId,
         horaSalida: horario.horaSalida,
         diasSemana: horario.diasSemana,
         activo: horario.activo,
-      });
-    } else {
-      setFormData({
-        nombre: '',
-        rutaId: '',
-        embarcacionId: '',
-        horaSalida: '',
-        diasSemana: [],
-        activo: true,
-      });
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [horario, open]);
+    return {
+      nombre: '',
+      rutaId: '',
+      embarcacionId: '',
+      horaSalida: '',
+      diasSemana: [],
+      activo: true,
+    };
+  });
 
   const toggleDiaSemana = (dia: number) => {
     setFormData((prev) => {
@@ -137,16 +129,14 @@ export function HorarioFormDialog({
       onSuccess();
     } catch (error) {
       logError('Error al guardar horario', error);
-      toast.error(
-        error instanceof Error ? error.message : 'Error al guardar el horario'
-      );
+      toast.error(error instanceof Error ? error.message : 'Error al guardar el horario');
     }
   };
 
   const saving = createHorario.isPending || updateHorario.isPending;
 
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog key={horario?.id || 'new'} open={open} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>
@@ -193,9 +183,7 @@ export function HorarioFormDialog({
               <select
                 id="embarcacionId"
                 value={formData.embarcacionId}
-                onChange={(e) =>
-                  setFormData({ ...formData, embarcacionId: e.target.value })
-                }
+                onChange={(e) => setFormData({ ...formData, embarcacionId: e.target.value })}
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               >
                 <option value="">Selecciona una embarcación</option>
@@ -214,9 +202,7 @@ export function HorarioFormDialog({
               id="horaSalida"
               type="time"
               value={formData.horaSalida}
-              onChange={(e) =>
-                setFormData({ ...formData, horaSalida: e.target.value })
-              }
+              onChange={(e) => setFormData({ ...formData, horaSalida: e.target.value })}
             />
           </div>
 

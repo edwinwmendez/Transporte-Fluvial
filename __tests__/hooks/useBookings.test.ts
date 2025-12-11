@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { ReactNode, createElement } from 'react';
+import { renderHook, waitFor } from '@testing-library/react';
+import { createElement, ReactNode } from 'react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import * as bookingsApi from '@/lib/api/bookings.api';
 import { useBookingsForTrip, useCreateBooking } from '@/lib/hooks/useBookings';
 import type { Booking, Route } from '@/lib/types';
-import * as bookingsApi from '@/lib/api/bookings.api';
 
 // Mock de la API
 vi.mock('@/lib/api/bookings.api', () => ({
@@ -21,11 +22,7 @@ const createWrapper = () => {
   });
 
   return function Wrapper({ children }: { children: ReactNode }) {
-    return createElement(
-      QueryClientProvider,
-      { client: queryClient },
-      children
-    );
+    return createElement(QueryClientProvider, { client: queryClient }, children);
   };
 };
 
@@ -36,7 +33,7 @@ describe('useBookings', () => {
 
   describe('useBookingsForTrip', () => {
     it('debe obtener reservas de un viaje', async () => {
-      const mockBookings = [
+      const mockBookings: Booking[] = [
         {
           id: '1',
           viajeId: 'trip1',
@@ -45,10 +42,12 @@ describe('useBookings', () => {
           dniPasajero: '12345678',
           telefonoPasajero: '987654321',
           estado: 'confirmado',
+          createdAt: { toDate: () => new Date() } as { toDate: () => Date },
+          updatedAt: { toDate: () => new Date() } as { toDate: () => Date },
         },
       ];
 
-      vi.mocked(bookingsApi.getBookingsForTrip).mockResolvedValue(mockBookings as unknown as Booking[]);
+      vi.mocked(bookingsApi.getBookingsForTrip).mockResolvedValue(mockBookings);
 
       const { result } = renderHook(() => useBookingsForTrip('trip1'), {
         wrapper: createWrapper(),
@@ -98,7 +97,8 @@ describe('useBookings', () => {
           horasEstimadas: 12,
           precio: 150,
           activa: true,
-        } as unknown as Route,
+          paradasIntermedias: [],
+        } as Route,
       };
 
       result.current.mutate(bookingData);

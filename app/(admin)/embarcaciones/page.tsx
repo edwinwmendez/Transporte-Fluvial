@@ -1,28 +1,32 @@
 'use client';
 
+import { Loader2, Ship } from 'lucide-react';
 import { useState } from 'react';
-import { useVessels, useCreateVessel, useUpdateVessel, useDeleteVessel } from '@/lib/hooks/useVessels';
+
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { useToast } from '@/lib/hooks/useToast';
+import { useDeleteVessel, useVessels } from '@/lib/hooks/useVessels';
 import type { Vessel } from '@/lib/types';
+import { handleError } from '@/lib/utils/error-handler';
+
+import { VesselFormDialog } from './components/VesselFormDialog';
 import { VesselsList } from './components/VesselsList';
 import { VesselsToolbar } from './components/VesselsToolbar';
-import { VesselFormDialog } from './components/VesselFormDialog';
-import { Card, CardContent } from '@/components/ui/card';
-import { Ship, Loader2 } from 'lucide-react';
-import { useToast } from '@/lib/hooks/useToast';
-import { handleError } from '@/lib/utils/error-handler';
-import { Button } from '@/components/ui/button';
 
 /**
  * Página de administración de embarcaciones
- * 
+ *
  * Permite crear, editar y eliminar embarcaciones.
  * Define la capacidad y configuración de asientos (filas × columnas).
  */
 export default function EmbarcacionesPage() {
   const toast = useToast();
-  const { data: embarcaciones = [], isLoading: loadingEmbarcaciones, refetch: refetchEmbarcaciones } = useVessels();
-  // const createVessel = useCreateVessel();
-  // const updateVessel = useUpdateVessel();
+  const {
+    data: embarcaciones = [],
+    isLoading: loadingEmbarcaciones,
+    refetch: refetchEmbarcaciones,
+  } = useVessels();
   const deleteVessel = useDeleteVessel();
 
   const [showDialog, setShowDialog] = useState(false);

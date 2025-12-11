@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,16 +12,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { useGenerateTrips } from '@/lib/hooks/schedules/useGenerateTrips';
+import { useCalcularViajesDesdeHorario } from '@/lib/hooks/useSchedules';
+import { useToast } from '@/lib/hooks/useToast';
 import type { HorarioRecurrente } from '@/lib/types';
 import { parseLocalDate } from '@/lib/utils/date-helpers';
 import { formatLocalDate } from '@/lib/utils/formatters';
-import { useCalcularViajesDesdeHorario } from '@/lib/hooks/useSchedules';
-import { useGenerateTrips } from '@/lib/hooks/schedules/useGenerateTrips';
-import { useToast } from '@/lib/hooks/useToast';
 
 interface GenerateTripsDialogProps {
   open: boolean;
@@ -43,19 +44,20 @@ export function GenerateTripsDialog({
   const fechaInicioDate = fechaInicio ? parseLocalDate(fechaInicio) : null;
   const fechaFinDate = fechaFin ? parseLocalDate(fechaFin) : null;
 
-  const { data: viajesEstimados = 0, isLoading: calculando } =
-    useCalcularViajesDesdeHorario(
-      horario?.id || null,
-      fechaInicioDate,
-      fechaFinDate
-    );
+  const { data: viajesEstimados = 0, isLoading: calculando } = useCalcularViajesDesdeHorario(
+    horario?.id || null,
+    fechaInicioDate,
+    fechaFinDate
+  );
 
   const { generateTrips, progress, isGenerating } = useGenerateTrips({
     onComplete,
   });
 
-  useEffect(() => {
-    if (open && horario) {
+  // Calcular fechas del próximo mes cuando se abre el dialog
+  // Usamos useMemo para calcular las fechas iniciales basadas en horario
+  const fechasIniciales = useMemo(() => {
+    if (horario && open) {
       const hoy = new Date();
       const proximoMes = new Date(hoy);
       proximoMes.setMonth(proximoMes.getMonth() + 1);
@@ -65,11 +67,19 @@ export function GenerateTripsDialog({
       finMes.setMonth(finMes.getMonth() + 1);
       finMes.setDate(0);
 
-      setFechaInicio(formatLocalDate(proximoMes));
-      setFechaFin(formatLocalDate(finMes));
+      return {
+        inicio: formatLocalDate(proximoMes),
+        fin: formatLocalDate(finMes),
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open, horario]);
+    return { inicio: '', fin: '' };
+  }, [horario, open]);
+
+  // Sincronizar fechas cuando cambian las fechas iniciales calculadas
+  useEffect(() => {
+    setFechaInicio(fechasIniciales.inicio);
+    setFechaFin(fechasIniciales.fin);
+  }, [fechasIniciales]);
 
   const handleGenerate = async () => {
     if (!horario || !fechaInicio || !fechaFin) {
@@ -98,14 +108,19 @@ export function GenerateTripsDialog({
     return dias.map((dia) => nombres[dia]).join(', ');
   };
 
+  const handleClose = () => {
+    setFechaInicio('');
+    setFechaFin('');
+    onClose();
+  };
+
   return (
-    <Dialog open={open} onOpenChange={onClose}>
+    <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>Generar Viajes desde Horario</DialogTitle>
           <DialogDescription>
-            Genera viajes automáticamente para el horario:{' '}
-            <strong>{horario?.nombre}</strong>
+            Genera viajes automáticamente para el horario: <strong>{horario?.nombre}</strong>
           </DialogDescription>
         </DialogHeader>
 

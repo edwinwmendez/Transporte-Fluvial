@@ -1,14 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Calculator } from 'lucide-react';
+import { useState } from 'react';
+
 import { FormDialog } from '@/components/shared/FormDialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Calculator } from 'lucide-react';
-import type { Vessel } from '@/lib/types';
-import { useCreateVessel, useUpdateVessel } from '@/lib/hooks/useVessels';
 import { useToast } from '@/lib/hooks/useToast';
+import { useCreateVessel, useUpdateVessel } from '@/lib/hooks/useVessels';
+import type { Vessel } from '@/lib/types';
 import { handleError } from '@/lib/utils/error-handler';
 
 interface VesselFormDialogProps {
@@ -26,34 +27,26 @@ export function VesselFormDialog({ open, vessel, onClose, onSuccess }: VesselFor
   const createVessel = useCreateVessel();
   const updateVessel = useUpdateVessel();
 
-  const [formData, setFormData] = useState({
-    nombre: '',
-    capacidad: '',
-    filas: '',
-    columnas: '',
-    activa: true,
-  });
-
-  useEffect(() => {
+  // Inicializar formData basado en vessel usando función inicializadora
+  // El key prop en FormDialog fuerza remount cuando cambia vessel, así que esto solo se ejecuta una vez
+  const [formData, setFormData] = useState(() => {
     if (vessel) {
-      setFormData({
+      return {
         nombre: vessel.nombre,
         capacidad: vessel.capacidad.toString(),
         filas: vessel.filas.toString(),
         columnas: vessel.columnas.toString(),
         activa: vessel.activa,
-      });
-    } else {
-      setFormData({
-        nombre: '',
-        capacidad: '',
-        filas: '',
-        columnas: '',
-        activa: true,
-      });
+      };
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [vessel, open]);
+    return {
+      nombre: '',
+      capacidad: '',
+      filas: '',
+      columnas: '',
+      activa: true,
+    };
+  });
 
   const handleCalculateCapacity = () => {
     const filas = parseInt(formData.filas) || 0;
@@ -115,10 +108,15 @@ export function VesselFormDialog({ open, vessel, onClose, onSuccess }: VesselFor
 
   return (
     <FormDialog
+      key={vessel?.id || 'new'}
       open={open}
       onOpenChange={onClose}
       title={vessel ? 'Editar Embarcación' : 'Nueva Embarcación'}
-      description={vessel ? 'Modifica los datos de la embarcación' : 'Completa los datos de la nueva embarcación'}
+      description={
+        vessel
+          ? 'Modifica los datos de la embarcación'
+          : 'Completa los datos de la nueva embarcación'
+      }
       onSubmit={handleSubmit}
       loading={loading}
     >

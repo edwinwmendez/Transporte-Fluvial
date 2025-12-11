@@ -1,15 +1,16 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Plus, X } from 'lucide-react';
+import { useState } from 'react';
+
 import { FormDialog } from '@/components/shared/FormDialog';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Plus, X } from 'lucide-react';
-import type { Route, ParadaIntermedia } from '@/lib/types';
 import { useCreateRoute, useUpdateRoute } from '@/lib/hooks/useRoutes';
 import { useToast } from '@/lib/hooks/useToast';
+import type { ParadaIntermedia, Route } from '@/lib/types';
 import { handleError } from '@/lib/utils/error-handler';
 
 interface RutaFormDialogProps {
@@ -27,14 +28,29 @@ export function RutaFormDialog({ open, ruta, onClose, onSuccess }: RutaFormDialo
   const createRoute = useCreateRoute();
   const updateRoute = useUpdateRoute();
 
-  const [formData, setFormData] = useState({
-    origen: '',
-    destino: '',
-    distancia: '',
-    horasEstimadas: '',
-    precio: '',
-    activa: true,
-    paradasIntermedias: [] as ParadaIntermedia[],
+  // Inicializar formData basado en ruta usando función inicializadora
+  // El key prop en FormDialog fuerza remount cuando cambia ruta, así que esto solo se ejecuta una vez
+  const [formData, setFormData] = useState(() => {
+    if (ruta) {
+      return {
+        origen: ruta.origen,
+        destino: ruta.destino,
+        distancia: ruta.distancia.toString(),
+        horasEstimadas: ruta.horasEstimadas.toString(),
+        precio: ruta.precio.toString(),
+        activa: ruta.activa,
+        paradasIntermedias: ruta.paradasIntermedias || [],
+      };
+    }
+    return {
+      origen: '',
+      destino: '',
+      distancia: '',
+      horasEstimadas: '',
+      precio: '',
+      activa: true,
+      paradasIntermedias: [],
+    };
   });
 
   const [paradaForm, setParadaForm] = useState({
@@ -44,33 +60,14 @@ export function RutaFormDialog({ open, ruta, onClose, onSuccess }: RutaFormDialo
     orden: 1,
   });
 
-  useEffect(() => {
-    if (ruta) {
-      setFormData({
-        origen: ruta.origen,
-        destino: ruta.destino,
-        distancia: ruta.distancia.toString(),
-        horasEstimadas: ruta.horasEstimadas.toString(),
-        precio: ruta.precio.toString(),
-        activa: ruta.activa,
-        paradasIntermedias: ruta.paradasIntermedias || [],
-      });
-    } else {
-      setFormData({
-        origen: '',
-        destino: '',
-        distancia: '',
-        horasEstimadas: '',
-        precio: '',
-        activa: true,
-        paradasIntermedias: [],
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ruta, open]);
-
   const handleSubmit = async () => {
-    if (!formData.origen || !formData.destino || !formData.distancia || !formData.horasEstimadas || !formData.precio) {
+    if (
+      !formData.origen ||
+      !formData.destino ||
+      !formData.distancia ||
+      !formData.horasEstimadas ||
+      !formData.precio
+    ) {
       toast.error('Completa todos los campos obligatorios');
       return;
     }
@@ -139,6 +136,7 @@ export function RutaFormDialog({ open, ruta, onClose, onSuccess }: RutaFormDialo
 
   return (
     <FormDialog
+      key={ruta?.id || 'new'}
       open={open}
       onOpenChange={onClose}
       title={ruta ? 'Editar Ruta' : 'Nueva Ruta'}
@@ -226,7 +224,9 @@ export function RutaFormDialog({ open, ruta, onClose, onSuccess }: RutaFormDialo
                 type="number"
                 placeholder="Distancia (km)"
                 value={paradaForm.distanciaDesdeOrigen}
-                onChange={(e) => setParadaForm({ ...paradaForm, distanciaDesdeOrigen: e.target.value })}
+                onChange={(e) =>
+                  setParadaForm({ ...paradaForm, distanciaDesdeOrigen: e.target.value })
+                }
                 min="0"
               />
               <Input

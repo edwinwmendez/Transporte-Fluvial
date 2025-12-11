@@ -1,24 +1,30 @@
 'use client';
 
+import { Clock, Loader2, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { useHorarios } from '@/lib/hooks/useSchedules';
-import { useRoutes } from '@/lib/hooks/useRoutes';
-import { useVessels } from '@/lib/hooks/useVessels';
-import { useDeleteHorario, useGenerateTripsNextMonth } from '@/lib/hooks/useSchedules';
-import { HorariosList } from './components/HorariosList';
-import { HorariosToolbar } from './components/HorariosToolbar';
-import { HorarioFormDialog } from './components/HorarioFormDialog';
-import { GenerateTripsDialog } from './components/GenerateTripsDialog';
-import { Card, CardContent } from '@/components/ui/card';
+
 import { Button } from '@/components/ui/button';
-import { Plus, Clock, Loader2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { useRoutes } from '@/lib/hooks/useRoutes';
+import { useHorarios } from '@/lib/hooks/useSchedules';
+import { useDeleteHorario, useGenerateTripsNextMonth } from '@/lib/hooks/useSchedules';
 import { useToast } from '@/lib/hooks/useToast';
+import { useVessels } from '@/lib/hooks/useVessels';
 import type { HorarioRecurrente } from '@/lib/types';
 import { logError } from '@/lib/utils/logger';
 
+import { GenerateTripsDialog } from './components/GenerateTripsDialog';
+import { HorarioFormDialog } from './components/HorarioFormDialog';
+import { HorariosList } from './components/HorariosList';
+import { HorariosToolbar } from './components/HorariosToolbar';
+
 export default function HorariosPage() {
   const toast = useToast();
-  const { data: horarios = [], isLoading: loadingHorarios, refetch: refetchHorarios } = useHorarios();
+  const {
+    data: horarios = [],
+    isLoading: loadingHorarios,
+    refetch: refetchHorarios,
+  } = useHorarios();
   const { data: rutas = [], isLoading: loadingRutas } = useRoutes();
   const { data: embarcaciones = [], isLoading: loadingEmbarcaciones } = useVessels();
   const deleteHorario = useDeleteHorario();
@@ -46,7 +52,7 @@ export default function HorariosPage() {
   const handleDelete = async (horarioId: string) => {
     const horario = horarios.find((h) => h.id === horarioId);
     if (!horario) return;
-    
+
     if (!confirm(`¿Estás seguro de eliminar el horario "${horario.nombre}"?`)) {
       return;
     }
@@ -57,9 +63,7 @@ export default function HorariosPage() {
       refetchHorarios();
     } catch (err) {
       logError('Error al eliminar horario', err);
-      toast.error(
-        error instanceof Error ? error.message : 'Error al eliminar el horario'
-      );
+      toast.error(err instanceof Error ? err.message : 'Error al eliminar el horario');
     }
   };
 
@@ -73,7 +77,7 @@ export default function HorariosPage() {
       await generateNextMonth.mutateAsync();
       toast.success('Viajes del próximo mes generados exitosamente');
       setShowGenerateNextMonthDialog(false);
-    } catch (error) {
+    } catch {
       // Error ya manejado en el hook
     }
   };
@@ -108,9 +112,7 @@ export default function HorariosPage() {
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">
-                No hay horarios recurrentes registrados
-              </p>
+              <p className="text-muted-foreground">No hay horarios recurrentes registrados</p>
               <p className="text-sm text-muted-foreground mt-2">
                 Crea horarios recurrentes para automatizar la generación de viajes
               </p>
@@ -173,9 +175,7 @@ export default function HorariosPage() {
                   disabled={generateNextMonth.isPending}
                   className="flex-1"
                 >
-                  {generateNextMonth.isPending && (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  )}
+                  {generateNextMonth.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Generar
                 </Button>
               </div>
