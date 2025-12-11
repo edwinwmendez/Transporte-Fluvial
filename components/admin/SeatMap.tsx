@@ -1,13 +1,11 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useSeatsSubscription } from '@/lib/hooks/useSeats';
+import { estaAsientoCompletamenteOcupado } from '@/lib/api/bookings.api';
 import { useBookingsSubscription } from '@/lib/hooks/useBookings';
 import { useRoute } from '@/lib/hooks/useRoutes';
-import { estaAsientoCompletamenteOcupado } from '@/lib/api/bookings.api';
-import type { Seat, Booking } from '@/lib/types';
+import { useSeatsSubscription } from '@/lib/hooks/useSeats';
+import type { Booking, Seat } from '@/lib/types';
 import { cn } from '@/lib/utils';
-import { User, Check } from 'lucide-react';
 
 interface SeatMapProps {
   tripId: string;
@@ -20,18 +18,11 @@ interface SeatMapProps {
 
 /**
  * Mapa de asientos interactivo para un viaje
- * 
+ *
  * Muestra asientos en layout 2-2 (ventana-pasillo | pasillo-ventana)
  * Con estados visuales: disponible, parcialmente ocupado, completamente ocupado, seleccionado
  */
-export function SeatMap({
-  tripId,
-  rutaId,
-  rows,
-  columns,
-  onSeatClick,
-  selectedSeatId,
-}: SeatMapProps) {
+export function SeatMap({ tripId, rutaId, rows, onSeatClick, selectedSeatId }: SeatMapProps) {
   // Usar hooks de suscripción para datos en tiempo real
   const { data: seats = [], isLoading: loadingSeats } = useSeatsSubscription(tripId);
   const { data: bookings = [], isLoading: loadingBookings } = useBookingsSubscription(tripId);
@@ -55,9 +46,7 @@ export function SeatMap({
     );
   };
 
-  const getSeatState = (
-    seat: Seat | undefined
-  ): 'available' | 'partial' | 'sold' | 'selected' => {
+  const getSeatState = (seat: Seat | undefined): 'available' | 'partial' | 'sold' | 'selected' => {
     if (!seat) return 'available';
     if (selectedSeatId === seat.id) return 'selected';
 
@@ -78,12 +67,16 @@ export function SeatMap({
   };
 
   const getSeatClasses = (state: 'available' | 'partial' | 'sold' | 'selected') => {
-    const base = 'relative w-12 h-12 rounded-md border-2 transition-all flex items-center justify-center text-xs font-semibold';
+    const base =
+      'relative w-12 h-12 rounded-md border-2 transition-all flex items-center justify-center text-xs font-semibold cursor-pointer';
     const variants = {
-      available: 'bg-[hsl(var(--seat-available-bg))] border-[hsl(var(--seat-available-border))] text-[hsl(var(--seat-available-text))] hover:opacity-80',
-      partial: 'bg-[hsl(var(--seat-partial-bg))] border-[hsl(var(--seat-partial-border))] text-[hsl(var(--seat-partial-text))] hover:opacity-80',
-      sold: 'bg-[hsl(var(--seat-sold-bg))] border-[hsl(var(--seat-sold-border))] text-[hsl(var(--seat-sold-text))] cursor-not-allowed opacity-60',
-      selected: 'bg-[hsl(var(--seat-selected-bg))] border-[hsl(var(--seat-selected-border))] text-[hsl(var(--seat-selected-text))] ring-2 ring-primary',
+      available:
+        'bg-[hsl(var(--seat-available-bg))] border-[hsl(var(--seat-available-border))] text-[hsl(var(--seat-available-text))] hover:opacity-80',
+      partial:
+        'bg-[hsl(var(--seat-partial-bg))] border-[hsl(var(--seat-partial-border))] text-[hsl(var(--seat-partial-text))] hover:opacity-80',
+      sold: 'bg-[hsl(var(--seat-sold-bg))] border-[hsl(var(--seat-sold-border))] text-[hsl(var(--seat-sold-text))] opacity-70 hover:opacity-90',
+      selected:
+        'bg-[hsl(var(--seat-selected-bg))] border-[hsl(var(--seat-selected-border))] text-[hsl(var(--seat-selected-text))] ring-2 ring-primary',
     };
     return cn(base, variants[state]);
   };
@@ -104,7 +97,6 @@ export function SeatMap({
                 key={seat.id}
                 onClick={() => onSeatClick(seat)}
                 className={getSeatClasses(state)}
-                disabled={state === 'sold'}
                 aria-label={`Asiento ${seat.numeroAsiento} - ${state === 'available' ? 'Disponible' : state === 'partial' ? 'Parcialmente ocupado' : 'Ocupado'}`}
                 title={`Asiento ${seat.numeroAsiento} - ${reservas.length} reserva${reservas.length !== 1 ? 's' : ''}`}
               >
@@ -135,7 +127,6 @@ export function SeatMap({
                 key={seat.id}
                 onClick={() => onSeatClick(seat)}
                 className={getSeatClasses(state)}
-                disabled={state === 'sold'}
                 aria-label={`Asiento ${seat.numeroAsiento} - ${state === 'available' ? 'Disponible' : state === 'partial' ? 'Parcialmente ocupado' : 'Ocupado'}`}
                 title={`Asiento ${seat.numeroAsiento} - ${reservas.length} reserva${reservas.length !== 1 ? 's' : ''}`}
               >

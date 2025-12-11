@@ -3,7 +3,6 @@ import nextVitals from "eslint-config-next/core-web-vitals";
 import nextTs from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 import simpleImportSort from "eslint-plugin-simple-import-sort";
-import tseslint from "@typescript-eslint/eslint-plugin";
 import tsparser from "@typescript-eslint/parser";
 
 const eslintConfig = defineConfig([
@@ -13,7 +12,6 @@ const eslintConfig = defineConfig([
     files: ["**/*.{js,jsx,ts,tsx}"],
     plugins: {
       "simple-import-sort": simpleImportSort,
-      "@typescript-eslint": tseslint,
     },
     languageOptions: {
       parser: tsparser,

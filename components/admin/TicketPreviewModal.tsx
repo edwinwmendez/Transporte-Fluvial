@@ -1,19 +1,25 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { X, Loader2 } from 'lucide-react';
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { useMarkTicketAsUsed } from '@/lib/hooks/useBookings';
+import { useTicketData } from '@/lib/hooks/useTicketData';
+import { useToast } from '@/lib/hooks/useToast';
 import { downloadFile } from '@/lib/storage-helpers';
 import { generateTicketPDF, type TicketData } from '@/lib/ticket-generator';
 import type { Booking } from '@/lib/types';
-import { useToast } from '@/lib/hooks/useToast';
-import { logError } from '@/lib/utils/logger';
 import { handleError } from '@/lib/utils/error-handler';
-import { useTicketData } from '@/lib/hooks/useTicketData';
-import { TicketDetails } from './bookings/TicketDetails';
+
 import { TicketActions } from './bookings/TicketActions';
-import { useMarkTicketAsUsed } from '@/lib/hooks/useBookings';
+import { TicketDetails } from './bookings/TicketDetails';
 
 interface TicketPreviewModalProps {
   open: boolean;
@@ -25,7 +31,7 @@ interface TicketPreviewModalProps {
 
 /**
  * Modal para previsualizar y gestionar un boleto digital
- * 
+ *
  * Permite:
  * - Ver detalles del boleto (pasajero, viaje, QR)
  * - Descargar PDF
@@ -75,7 +81,9 @@ export function TicketPreviewModal({
         destino: booking.destinoIntermedio || route.destino,
         monto: booking.pago?.monto || 0,
         metodoPago: booking.pago?.metodoPago || 'efectivo',
-        fechaEmision: booking.boleto?.emitidoEn?.toDate ? booking.boleto.emitidoEn.toDate() : new Date(),
+        fechaEmision: booking.boleto?.emitidoEn?.toDate
+          ? booking.boleto.emitidoEn.toDate()
+          : new Date(),
       };
 
       const blob = await generateTicketPDF(ticketData);
@@ -134,14 +142,16 @@ export function TicketPreviewModal({
         destino: booking.destinoIntermedio || route.destino,
         monto: booking.pago?.monto || 0,
         metodoPago: booking.pago?.metodoPago || 'efectivo',
-        fechaEmision: booking.boleto?.emitidoEn?.toDate ? booking.boleto.emitidoEn.toDate() : new Date(),
+        fechaEmision: booking.boleto?.emitidoEn?.toDate
+          ? booking.boleto.emitidoEn.toDate()
+          : new Date(),
       };
 
       const blob = await generateTicketPDF(ticketData);
       const url = URL.createObjectURL(blob);
       const whatsappUrl = `https://wa.me/51${whatsappPasajero}?text=Tu%20boleto%20${numeroTicket}`;
       window.open(whatsappUrl, '_blank');
-      
+
       setTimeout(() => {
         URL.revokeObjectURL(url);
       }, 500);
@@ -171,24 +181,12 @@ export function TicketPreviewModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-labelledby="ticket-modal-title">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <DialogTitle id="ticket-modal-title">Vista Previa del Boleto</DialogTitle>
-              <DialogDescription>
-                {numeroTicket} - {booking?.nombrePasajero}
-              </DialogDescription>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onOpenChange(false)}
-              aria-label="Cerrar modal"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
+          <DialogTitle>Vista Previa del Boleto</DialogTitle>
+          <DialogDescription>
+            {numeroTicket} - {booking?.nombrePasajero}
+          </DialogDescription>
         </DialogHeader>
 
         {isLoading ? (

@@ -1,23 +1,21 @@
 import {
   collection,
   doc,
-  getDoc,
-  getDocs,
-  addDoc,
-  updateDoc,
-  query,
-  where,
-  orderBy,
-  limit,
-  runTransaction,
-  onSnapshot,
-  Timestamp,
-  QuerySnapshot,
   DocumentData,
+  getDocs,
+  limit,
+  onSnapshot,
+  orderBy,
+  query,
+  QuerySnapshot,
+  runTransaction,
+  Timestamp,
+  updateDoc,
+  where,
 } from 'firebase/firestore';
+
 import { db } from '../services/firebase.service';
-import type { Booking, Route, PagoInfo } from '../types';
-import { formatLocalDate } from '../utils/formatters';
+import type { Booking, PagoInfo, Route } from '../types';
 import { logError } from '../utils/logger';
 
 /**
@@ -74,10 +72,7 @@ function verificarConflictoTramos(
 /**
  * Obtener todas las reservas de un asiento específico
  */
-export async function getBookingsForSeat(
-  viajeId: string,
-  asientoId: string
-): Promise<Booking[]> {
+export async function getBookingsForSeat(viajeId: string, asientoId: string): Promise<Booking[]> {
   const reservasRef = collection(db, 'reservas');
   const q = query(
     reservasRef,
@@ -136,6 +131,21 @@ export async function verificarDisponibilidadTramo(
 
 /**
  * Obtener destinos disponibles desde un punto de origen específico
+ *
+ * Calcula el precio del tramo restando el precio acumulado del origen
+ * del precio acumulado del destino.
+ *
+ * @example
+ * Ruta: Pucallpa → Bolognesi (S/100) → Unini (S/150) → Atalaya (S/200)
+ *
+ * Si puntoOrigen = "Bolognesi":
+ *   - Unini: 150 - 100 = S/50
+ *   - Atalaya: 200 - 100 = S/100
+ *
+ * Si puntoOrigen = "Pucallpa":
+ *   - Bolognesi: 100 - 0 = S/100
+ *   - Unini: 150 - 0 = S/150
+ *   - Atalaya: 200 - 0 = S/200
  */
 export function obtenerDestinosDisponiblesDesde(
   ruta: Route,
@@ -154,25 +164,47 @@ export function obtenerDestinosDisponiblesDesde(
     return [];
   }
 
+  // Obtener el precio acumulado del punto de origen actual
+  // Si es el origen principal, el precio acumulado es 0
+  // Si es una parada intermedia, usar su precio acumulado
+  let precioOrigenAcumulado = 0;
+
+  if (puntoOrigen !== ruta.origen) {
+    // Buscar en paradas intermedias
+    const paradaOrigen = ruta.paradasIntermedias?.find((p) => p.nombre === puntoOrigen);
+    if (paradaOrigen) {
+      precioOrigenAcumulado = paradaOrigen.precio;
+    } else if (puntoOrigen === ruta.destino) {
+      // Si el punto de origen es el destino final (caso edge, no debería ocurrir)
+      precioOrigenAcumulado = ruta.precio || 0;
+    }
+  }
+  // Si puntoOrigen === ruta.origen, precioOrigenAcumulado permanece en 0
+
+  // Agregar paradas intermedias disponibles con precio de tramo calculado
   if (ruta.paradasIntermedias && ruta.paradasIntermedias.length > 0) {
     const paradasOrdenadas = [...ruta.paradasIntermedias].sort((a, b) => a.orden - b.orden);
     for (const parada of paradasOrdenadas) {
       const ordenParada = orden.get(parada.nombre) ?? -1;
       if (ordenParada > ordenOrigen) {
+        // Calcular precio del tramo: precio acumulado de destino - precio acumulado de origen
+        const precioTramo = parada.precio - precioOrigenAcumulado;
         destinos.push({
           nombre: parada.nombre,
-          precio: parada.precio,
+          precio: Math.max(0, precioTramo), // Asegurar que no sea negativo
           esDestinoFinal: false,
         });
       }
     }
   }
 
+  // Agregar destino final con precio de tramo calculado
   const ordenDestinoFinal = orden.get(ruta.destino) ?? -1;
   if (puntoOrigen !== ruta.destino && ordenDestinoFinal > ordenOrigen) {
+    const precioTramo = (ruta.precio || 0) - precioOrigenAcumulado;
     destinos.push({
       nombre: ruta.destino,
-      precio: ruta.precio || 0,
+      precio: Math.max(0, precioTramo), // Asegurar que no sea negativo
       esDestinoFinal: true,
     });
   }
@@ -519,10 +551,13 @@ export async function getBookingsWithPendingPayments(): Promise<Booking[]> {
     logError('Error al obtener reservas con pagos pendientes', error);
     const allReservas = await getDocs(reservasRef);
     return allReservas.docs
-      .map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      } as Booking))
+      .map(
+        (doc) =>
+          ({
+            id: doc.id,
+            ...doc.data(),
+          }) as Booking
+      )
       .filter((booking) => booking.pago?.estado === 'pendiente');
   }
 }
@@ -556,11 +591,7 @@ export async function getBookingByTicketNumber(numeroTicket: string): Promise<Bo
 export async function getBookingsByDni(dni: string): Promise<Booking[]> {
   try {
     const reservasRef = collection(db, 'reservas');
-    const q = query(
-      reservasRef,
-      where('dniPasajero', '==', dni),
-      orderBy('createdAt', 'desc')
-    );
+    const q = query(reservasRef, where('dniPasajero', '==', dni), orderBy('createdAt', 'desc'));
 
     const snapshot = await getDocs(q);
     return snapshot.docs.map((doc) => ({

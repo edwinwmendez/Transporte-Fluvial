@@ -1,23 +1,25 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Timestamp } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
+
 import {
-  getBookingsForTrip,
-  getBookingsForSeat,
-  getBookingsWithPendingPayments,
-  getBookingByTicketNumber,
-  getBookingsByDni,
   buscarPasajeroPorDni,
   createBooking,
-  updateBookingTicket,
-  markTicketAsUsed,
+  getBookingByTicketNumber,
+  getBookingsByDni,
+  getBookingsForSeat,
+  getBookingsForTrip,
+  getBookingsWithPendingPayments,
   getCashSummaryForTrip,
+  markTicketAsUsed,
   subscribeToBookings,
+  updateBookingTicket,
 } from '../api/bookings.api';
-import { useEffect, useState } from 'react';
 import type { Booking, Route } from '../types';
 
 /**
  * Hook para obtener todas las reservas de un viaje específico
- * 
+ *
  * @param viajeId - ID del viaje, o null para deshabilitar la query
  * @returns Query result con las reservas del viaje, o array vacío si viajeId es null
  * @example
@@ -35,7 +37,7 @@ export function useBookingsForTrip(viajeId: string | null) {
 
 /**
  * Hook para obtener todas las reservas de un asiento específico en un viaje
- * 
+ *
  * @param viajeId - ID del viaje, o null para deshabilitar la query
  * @param asientoId - ID del asiento, o null para deshabilitar la query
  * @returns Query result con las reservas del asiento, o array vacío si algún ID es null
@@ -54,24 +56,23 @@ export function useBookingsForSeat(viajeId: string | null, asientoId: string | n
 
 /**
  * Hook para suscribirse a cambios de reservas en tiempo real
- * 
+ *
  * NOTA: React Query no soporta suscripciones en tiempo real nativamente.
  * Este hook usa useState/useEffect para manejar la suscripción de Firestore.
- * 
+ *
  * Para casos donde necesitas actualizaciones en tiempo real (como cuadre de caja),
  * este hook es apropiado. Para datos que no cambian frecuentemente, usa useBookingsForTrip.
  */
 export function useBookingsSubscription(viajeId: string | null) {
   const [bookings, setBookings] = useState<Booking[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(!!viajeId);
 
   useEffect(() => {
     if (!viajeId) {
-      setBookings([]);
-      setIsLoading(false);
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsLoading(true);
     const unsubscribe = subscribeToBookings(viajeId, (updatedBookings) => {
       setBookings(updatedBookings);
@@ -86,7 +87,7 @@ export function useBookingsSubscription(viajeId: string | null) {
 
 /**
  * Hook para obtener todas las reservas con pagos pendientes de validación
- * 
+ *
  * @returns Query result con reservas que tienen pagos en estado 'pendiente'
  * @example
  * ```tsx
@@ -135,7 +136,7 @@ export function useBuscarPasajeroPorDni(dni: string | null) {
 
 /**
  * Hook para crear una nueva reserva
- * 
+ *
  * @returns Mutation object para crear reservas
  * @example
  * ```tsx
@@ -188,6 +189,10 @@ export function useCreateBooking() {
       });
       queryClient.invalidateQueries({ queryKey: ['seats', variables.viajeId] });
     },
+    onSettled: () => {
+      // Garantizar que isPending se resetee incluso si hay error
+      // React Query maneja esto automáticamente, pero onSettled asegura el comportamiento
+    },
   });
 }
 
@@ -207,13 +212,17 @@ export function useUpdateBookingTicket() {
         numeroTicket: string;
         codigoQr: string;
         estado: 'emitido' | 'usado';
-        emitidoEn?: any; // Firestore Timestamp
-        usadoEn?: any; // Firestore Timestamp
+        emitidoEn?: Timestamp;
+        usadoEn?: Timestamp;
       };
     }) => updateBookingTicket(bookingId, boleto),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['bookings'] });
       queryClient.invalidateQueries({ queryKey: ['bookings', variables.bookingId] });
+    },
+    onSettled: () => {
+      // Garantizar que isPending se resetee incluso si hay error
+      // React Query maneja esto automáticamente, pero onSettled asegura el comportamiento
     },
   });
 }

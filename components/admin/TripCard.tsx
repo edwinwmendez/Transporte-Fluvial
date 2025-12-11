@@ -1,16 +1,17 @@
 'use client';
 
-import React from 'react';
+import { ArrowRight, Calendar, Clock, Ship } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import React from 'react';
+
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, Ship, ArrowRight } from 'lucide-react';
-import type { Trip } from '@/lib/types';
-import { useVessel } from '@/lib/hooks/useVessels';
-import { useSeatsForTrip } from '@/lib/hooks/useSeats';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useBookingsForTrip } from '@/lib/hooks/useBookings';
-import { formatLocalDate } from '@/lib/utils/formatters';
+import { useSeatsForTrip } from '@/lib/hooks/useSeats';
+import { useVessel } from '@/lib/hooks/useVessels';
+import type { Trip } from '@/lib/types';
 import { cn } from '@/lib/utils';
+import { formatLocalDate } from '@/lib/utils/formatters';
 
 interface TripCardProps {
   trip: Trip;
@@ -18,7 +19,7 @@ interface TripCardProps {
 
 /**
  * Tarjeta para mostrar información de un viaje
- * 
+ *
  * Muestra:
  * - Fecha y hora de salida
  * - Información de la embarcación
@@ -37,7 +38,12 @@ export const TripCard = React.memo(function TripCard({ trip }: TripCardProps) {
       ? trip.fechaSalida
       : new Date();
 
-  const asientosOcupados = seats.filter((s) => s.estado === 'vendido').length;
+  // Calcular asientos ocupados desde bookings (fuente de verdad)
+  // Un asiento puede tener múltiples reservas (tramos diferentes), pero cuenta como 1 asiento ocupado
+  const asientosConReservas = new Set(
+    bookings.filter((b) => b.estado === 'confirmado').map((b) => b.asientoId)
+  ).size;
+  const asientosOcupados = asientosConReservas;
   const totalAsientos = seats.length;
   const ocupacion = totalAsientos > 0 ? (asientosOcupados / totalAsientos) * 100 : 0;
 
@@ -84,11 +90,7 @@ export const TripCard = React.memo(function TripCard({ trip }: TripCardProps) {
             <div
               className={cn(
                 'h-full rounded-full transition-all duration-500 ease-out',
-                ocupacion >= 80
-                  ? 'bg-destructive'
-                  : ocupacion >= 50
-                    ? 'bg-warning'
-                    : 'bg-success'
+                ocupacion >= 80 ? 'bg-destructive' : ocupacion >= 50 ? 'bg-warning' : 'bg-success'
               )}
               style={{ width: `${Math.min(ocupacion, 100)}%` }}
               role="progressbar"
@@ -105,13 +107,16 @@ export const TripCard = React.memo(function TripCard({ trip }: TripCardProps) {
           <span className="font-bold text-foreground">{bookings.length}</span>
         </div>
 
-        <Button 
-          onClick={handleViewDetails} 
-          className="w-full group/btn" 
+        <Button
+          onClick={handleViewDetails}
+          className="w-full group/btn"
           aria-label={`Ver detalles del viaje del ${formatLocalDate(fechaSalida)}`}
         >
           Ver Detalles
-          <ArrowRight className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
+          <ArrowRight
+            className="ml-2 h-4 w-4 group-hover/btn:translate-x-1 transition-transform"
+            aria-hidden="true"
+          />
         </Button>
       </CardContent>
     </Card>

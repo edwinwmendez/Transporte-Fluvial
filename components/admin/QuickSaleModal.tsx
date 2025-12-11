@@ -1,6 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { Timestamp } from 'firebase/firestore';
+import { Loader2, Ticket, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -9,27 +14,22 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Ticket, Wallet } from 'lucide-react';
-import { useBookingForm } from '@/lib/hooks/useBookingForm';
-import { useTicketGeneration } from '@/lib/hooks/useTicketGeneration';
-import { usePaymentUpload } from '@/lib/hooks/usePaymentUpload';
-import { useCreateBooking, useBuscarPasajeroPorDni } from '@/lib/hooks/useBookings';
-import { useRoute } from '@/lib/hooks/useRoutes';
 import { useAvailableDestinations } from '@/lib/hooks/useAvailableDestinations';
-import type { Seat, Route, Booking } from '@/lib/types';
-import { Timestamp } from 'firebase/firestore';
+import { useBookingForm } from '@/lib/hooks/useBookingForm';
+import { useBuscarPasajeroPorDni, useCreateBooking } from '@/lib/hooks/useBookings';
 import { useUpdateBookingTicket } from '@/lib/hooks/useBookings';
-import { PaymentScreenshotUploader } from './PaymentScreenshotUploader';
-import { TicketPreviewModal } from './TicketPreviewModal';
+import { usePaymentUpload } from '@/lib/hooks/usePaymentUpload';
+import { useRoute } from '@/lib/hooks/useRoutes';
+import { useTicketGeneration } from '@/lib/hooks/useTicketGeneration';
+import { useToast } from '@/lib/hooks/useToast';
+import type { Booking, Route, Seat } from '@/lib/types';
+import { logError } from '@/lib/utils/logger';
+
+import { DestinationSelector } from './bookings/DestinationSelector';
 import { PassengerForm } from './bookings/PassengerForm';
 import { PaymentMethodSelector } from './bookings/PaymentMethodSelector';
-import { DestinationSelector } from './bookings/DestinationSelector';
-import { useToast } from '@/lib/hooks/useToast';
-import { cn } from '@/lib/utils';
-import { logError } from '@/lib/utils/logger';
-import type { BookingFormErrors } from '@/lib/hooks/useBookingForm';
+import { PaymentScreenshotUploader } from './PaymentScreenshotUploader';
+import { TicketPreviewModal } from './TicketPreviewModal';
 
 interface QuickSaleModalProps {
   tripId: string;
@@ -59,15 +59,7 @@ export function QuickSaleModal({
   const { generateTicket, generating: generatingTicket } = useTicketGeneration();
   const { uploadScreenshot, uploading: uploadingScreenshot } = usePaymentUpload();
 
-  const {
-    formData,
-    errors,
-    updateField,
-    setFormData,
-    validate,
-    reset,
-    sanitizeData,
-  } = useBookingForm();
+  const { formData, errors, updateField, validate, reset, sanitizeData } = useBookingForm();
 
   const [screenshotFile, setScreenshotFile] = useState<File | null>(null);
   const [showTicketPreview, setShowTicketPreview] = useState(false);
@@ -78,7 +70,11 @@ export function QuickSaleModal({
   const rutaActual = rutaPrecargada || ruta;
 
   // Usar hook para cargar destinos disponibles
-  const { destinosDisponibles, puntoOrigen, loading: loadingDestinos } = useAvailableDestinations({
+  const {
+    destinosDisponibles,
+    puntoOrigen,
+    loading: loadingDestinos,
+  } = useAvailableDestinations({
     tripId,
     seatId: seat.id,
     route: rutaActual || null,
@@ -90,9 +86,8 @@ export function QuickSaleModal({
   useEffect(() => {
     if (destinosDisponibles.length > 0 && rutaActual && !formData.destinoIntermedio) {
       const primerDestino = destinosDisponibles[0];
-      const montoInicial = primerDestino.esDestinoFinal
-        ? rutaActual.precio || 0
-        : primerDestino.precio;
+      // Usar siempre primerDestino.precio ya que viene calculado desde obtenerDestinosDisponiblesDesde()
+      const montoInicial = primerDestino.precio;
 
       updateField('destinoIntermedio', primerDestino.nombre);
       updateField('monto', montoInicial > 0 ? montoInicial.toString() : '');
@@ -112,18 +107,13 @@ export function QuickSaleModal({
 
   const handleDestinoChange = (destino: string) => {
     const destinoData = destinosDisponibles.find((d) => d.nombre === destino);
-    const esDestinoFinal = destinoData?.esDestinoFinal || destino === rutaActual?.destino;
 
     updateField('destinoIntermedio', destino);
 
-    if (esDestinoFinal) {
-      if (rutaActual && rutaActual.precio > 0) {
-        updateField('monto', rutaActual.precio.toString());
-      }
-    } else if (destinoData) {
-      if (destinoData.precio > 0) {
-        updateField('monto', destinoData.precio.toString());
-      }
+    // Usar siempre destinoData.precio ya que viene calculado desde obtenerDestinosDisponiblesDesde()
+    // que calcula correctamente el precio del tramo (no el precio total de la ruta)
+    if (destinoData && destinoData.precio > 0) {
+      updateField('monto', destinoData.precio.toString());
     }
   };
 
@@ -152,22 +142,24 @@ export function QuickSaleModal({
         screenshotFile
       ) {
         try {
-          console.log('[QuickSale] Iniciando subida de screenshot', { tripId, metodoPago: sanitizedData.metodoPago, fileName: screenshotFile.name });
           const tempId = `temp_${Date.now()}`;
           screenshotData = await uploadScreenshot(screenshotFile, tripId, tempId);
-          console.log('[QuickSale] Screenshot subido exitosamente', { url: screenshotData.url, path: screenshotData.path });
         } catch (uploadError) {
           console.error('[QuickSale] Error al subir screenshot', uploadError);
           logError('Error al subir screenshot', uploadError, { tripId });
           toast.error('Error al subir el comprobante. La venta se registrará sin comprobante.');
           // Continuar sin screenshot - no es crítico para crear el booking
         }
-      } else if ((sanitizedData.metodoPago === 'yape' || sanitizedData.metodoPago === 'plin') && !screenshotFile) {
-        console.warn('[QuickSale] Método de pago YAPE/PLIN sin screenshot - continuando sin comprobante');
+      } else if (
+        (sanitizedData.metodoPago === 'yape' || sanitizedData.metodoPago === 'plin') &&
+        !screenshotFile
+      ) {
+        console.warn(
+          '[QuickSale] Método de pago YAPE/PLIN sin screenshot - continuando sin comprobante'
+        );
       }
 
       // Generar ticket y QR
-      console.log('[QuickSale] Iniciando generación de ticket', { tripId, seatId: seat.id });
       let numeroTicket: string;
       let codigoQr: string;
       try {
@@ -179,7 +171,6 @@ export function QuickSaleModal({
         });
         numeroTicket = ticketData.numeroTicket;
         codigoQr = ticketData.codigoQr;
-        console.log('[QuickSale] Ticket generado exitosamente', { numeroTicket });
       } catch (ticketError) {
         console.error('[QuickSale] Error al generar ticket', ticketError);
         logError('Error al generar ticket', ticketError, { tripId, seatId: seat.id });
@@ -187,7 +178,6 @@ export function QuickSaleModal({
       }
 
       // Crear reserva
-      console.log('[QuickSale] Iniciando creación de reserva', { tripId, seatId: seat.id });
       let bookingId: string;
       try {
         bookingId = await createBookingMutation.mutateAsync({
@@ -199,7 +189,8 @@ export function QuickSaleModal({
             telefono: sanitizedData.telefono,
             whatsapp: sanitizedData.whatsapp || undefined,
             destinoIntermedio:
-              sanitizedData.destinoIntermedio && sanitizedData.destinoIntermedio !== rutaActual.destino
+              sanitizedData.destinoIntermedio &&
+              sanitizedData.destinoIntermedio !== rutaActual.destino
                 ? sanitizedData.destinoIntermedio
                 : undefined,
             monto,
@@ -210,7 +201,6 @@ export function QuickSaleModal({
           },
           ruta: rutaActual,
         });
-        console.log('[QuickSale] Reserva creada exitosamente', { bookingId });
       } catch (bookingError) {
         console.error('[QuickSale] Error al crear reserva', bookingError);
         logError('Error al crear reserva', bookingError, { tripId, seatId: seat.id });
@@ -218,7 +208,6 @@ export function QuickSaleModal({
       }
 
       // Actualizar reserva con boleto
-      console.log('[QuickSale] Iniciando actualización de boleto', { bookingId });
       try {
         await updateBookingTicketMutation.mutateAsync({
           bookingId,
@@ -229,7 +218,6 @@ export function QuickSaleModal({
             emitidoEn: Timestamp.now(),
           },
         });
-        console.log('[QuickSale] Boleto actualizado exitosamente', { bookingId, numeroTicket });
       } catch (updateError) {
         console.error('[QuickSale] Error al actualizar boleto', updateError);
         logError('Error al actualizar boleto', updateError, { bookingId });
@@ -257,8 +245,7 @@ export function QuickSaleModal({
           metodoPago: sanitizedData.metodoPago,
           estado: sanitizedData.metodoPago === 'efectivo' ? 'validado' : 'pendiente',
           validadoPor: sanitizedData.metodoPago === 'efectivo' ? 'sistema' : undefined,
-          validadoEn:
-            sanitizedData.metodoPago === 'efectivo' ? Timestamp.now() : undefined,
+          validadoEn: sanitizedData.metodoPago === 'efectivo' ? Timestamp.now() : undefined,
           screenshotUrl: screenshotData?.url,
           screenshotPath: screenshotData?.path,
         },
@@ -285,15 +272,18 @@ export function QuickSaleModal({
       const errorMessage =
         error instanceof Error ? error.message : 'Error al registrar la venta. Intenta nuevamente.';
       toast.error(errorMessage);
+      // Los estados de las mutations se resetean automáticamente con onSettled
+      // No es necesario resetear estados locales aquí ya que el usuario puede intentar nuevamente
     }
   };
 
-  const loading =
+  // Separar estados: isSubmitting solo para operaciones de submit
+  // loadingDestinos se maneja por separado para no bloquear interacción del usuario
+  const isSubmitting =
     createBookingMutation.isPending ||
     updateBookingTicketMutation.isPending ||
     generatingTicket ||
-    uploadingScreenshot ||
-    loadingDestinos;
+    uploadingScreenshot;
 
   return (
     <>
@@ -305,6 +295,10 @@ export function QuickSaleModal({
                 <Ticket className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 Emisión de Boleto
               </DialogTitle>
+              <DialogDescription>
+                Completa los datos del pasajero y selecciona el método de pago para emitir el boleto
+                del asiento {seat.numeroAsiento}
+              </DialogDescription>
               <div className="mt-2 sm:mt-3 flex items-center gap-2">
                 <Badge variant="default" className="px-3 py-1.5 text-xs font-bold tracking-wide">
                   ASIENTO {seat.numeroAsiento}
@@ -354,7 +348,7 @@ export function QuickSaleModal({
                     onUploadError={(errorMsg) => {
                       toast.error(`Error al subir comprobante: ${errorMsg}`);
                     }}
-                    disabled={loading}
+                    disabled={isSubmitting}
                   />
                 </div>
               )}
@@ -371,12 +365,15 @@ export function QuickSaleModal({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={loading}
+                disabled={isSubmitting || loadingDestinos}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={loading || destinosDisponibles.length === 0}>
-                {loading ? (
+              <Button
+                type="submit"
+                disabled={isSubmitting || loadingDestinos || destinosDisponibles.length === 0}
+              >
+                {isSubmitting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     Emitiendo...
