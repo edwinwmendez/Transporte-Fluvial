@@ -186,23 +186,23 @@ export function ManifestPreviewModal({
 
         <div className="space-y-4">
           {/* Información del viaje */}
-          <div className="rounded-lg border bg-muted/30 p-4">
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div>
-                <span className="text-muted-foreground">Embarcación:</span>
-                <span className="ml-2 font-medium">{vessel.nombre}</span>
+          <div className="rounded-xl border-2 border-border bg-gradient-to-br from-muted/40 to-muted/20 p-5 shadow-sm">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">Embarcación:</span>
+                <span className="font-semibold text-foreground">{vessel.nombre}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Fecha:</span>
-                <span className="ml-2 font-medium">{formatDate(trip.fechaSalida)}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">Fecha:</span>
+                <span className="font-semibold text-foreground">{formatDate(trip.fechaSalida)}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Hora:</span>
-                <span className="ml-2 font-medium">{trip.horaSalida}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">Hora:</span>
+                <span className="font-semibold text-foreground">{trip.horaSalida}</span>
               </div>
-              <div>
-                <span className="text-muted-foreground">Ruta:</span>
-                <span className="ml-2 font-medium">
+              <div className="flex items-center gap-2">
+                <span className="text-muted-foreground font-medium">Ruta:</span>
+                <span className="font-semibold text-foreground">
                   {routeData.origen} → {routeData.destino}
                 </span>
               </div>
@@ -210,13 +210,13 @@ export function ManifestPreviewModal({
           </div>
 
           {/* Lista de pasajeros */}
-          <div className="rounded-lg border">
-            <div className="bg-muted/50 p-3 border-b">
+          <div className="rounded-xl border-2 border-border overflow-hidden shadow-sm">
+            <div className="bg-gradient-to-r from-muted/60 to-muted/40 p-4 border-b border-border">
               <h3 className="font-semibold">Pasajeros ({bookings.length})</h3>
             </div>
             <div className="max-h-96 overflow-y-auto">
               <table className="w-full text-sm">
-                <thead className="bg-muted/30 sticky top-0">
+                <thead className="bg-muted/40 sticky top-0 border-b border-border">
                   <tr>
                     <th className="p-2 text-left">#</th>
                     <th className="p-2 text-left">Nombre</th>
@@ -232,7 +232,7 @@ export function ManifestPreviewModal({
                     .map((booking, index) => {
                       const seat = seats.find((s) => s.id === booking.asientoId);
                       return (
-                        <tr key={booking.id} className="border-b hover:bg-muted/20">
+                        <tr key={booking.id} className="border-b hover:bg-muted/30 transition-colors">
                           <td className="p-2">{index + 1}</td>
                           <td className="p-2 font-medium">{booking.nombrePasajero}</td>
                           <td className="p-2">{booking.dniPasajero}</td>

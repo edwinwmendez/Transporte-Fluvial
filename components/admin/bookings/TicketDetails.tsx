@@ -26,49 +26,64 @@ export function TicketDetails({
   numeroTicket,
 }: TicketDetailsProps) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Ticket className="h-5 w-5 text-primary" />
-          Detalles del Boleto
+    <Card className="border-2">
+      <CardHeader className="bg-gradient-to-r from-primary/5 to-primary/10 border-b">
+        <CardTitle className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-primary/10 border border-primary/20">
+            <Ticket className="h-5 w-5 text-primary" />
+          </div>
+          <span>Detalles del Boleto</span>
         </CardTitle>
       </CardHeader>
-      <CardContent className="space-y-6">
+      <CardContent className="space-y-6 pt-6">
         {/* Información del pasajero */}
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-muted-foreground uppercase">Pasajero</h3>
-          <div className="space-y-2 text-sm">
+        <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+          <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+            <User className="h-4 w-4 text-primary" />
+            Pasajero
+          </h3>
+          <div className="space-y-2.5 text-sm pl-6">
             <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-muted-foreground" />
-              <span className="font-medium">{booking.nombrePasajero}</span>
+              <span className="font-semibold text-foreground">{booking.nombrePasajero}</span>
             </div>
-            <div className="flex items-center gap-4 text-muted-foreground">
-              <span>DNI: {booking.dniPasajero}</span>
-              <span>•</span>
-              <span>Tel: {booking.telefonoPasajero}</span>
+            <div className="flex flex-wrap items-center gap-3 text-muted-foreground">
+              <span className="flex items-center gap-1.5">
+                <span className="font-medium">DNI:</span>
+                <span className="font-mono">{booking.dniPasajero}</span>
+              </span>
+              <span className="text-muted-foreground/50">•</span>
+              <span className="flex items-center gap-1.5">
+                <span className="font-medium">Tel:</span>
+                <span>{booking.telefonoPasajero}</span>
+              </span>
             </div>
           </div>
         </div>
 
         {/* Información del viaje */}
         {trip && vessel && route && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase">Viaje</h3>
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center gap-2">
+          <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+              <Ship className="h-4 w-4 text-primary" />
+              Viaje
+            </h3>
+            <div className="space-y-3 text-sm pl-6">
+              <div className="flex items-center gap-2.5">
                 <Ship className="h-4 w-4 text-muted-foreground" />
-                <span>{vessel.nombre}</span>
+                <span className="font-medium text-foreground">{vessel.nombre}</span>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <MapPin className="h-4 w-4 text-muted-foreground" />
-                <span>
-                  {booking.origenIntermedio || route.origen} → {booking.destinoIntermedio || route.destino}
+                <span className="text-foreground">
+                  <span className="font-semibold">{booking.origenIntermedio || route.origen}</span>
+                  <span className="mx-2 text-muted-foreground">→</span>
+                  <span className="font-semibold">{booking.destinoIntermedio || route.destino}</span>
                 </span>
               </div>
               {trip.fechaSalida && (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2.5">
                   <Calendar className="h-4 w-4 text-muted-foreground" />
-                  <span>
+                  <span className="text-foreground">
                     {trip.fechaSalida.toDate
                       ? trip.fechaSalida.toDate().toLocaleDateString('es-PE', {
                           weekday: 'long',
@@ -80,14 +95,17 @@ export function TicketDetails({
                   </span>
                 </div>
               )}
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <Clock className="h-4 w-4 text-muted-foreground" />
-                <span>Hora de salida: {trip.horaSalida}</span>
+                <span className="text-foreground">
+                  <span className="text-muted-foreground">Hora de salida:</span>{' '}
+                  <span className="font-semibold">{trip.horaSalida}</span>
+                </span>
               </div>
               {seat && (
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold">Asiento:</span>
-                  <Badge variant="outline" className="font-mono">
+                <div className="flex items-center gap-2.5 pt-2 border-t border-border">
+                  <span className="font-semibold text-foreground">Asiento:</span>
+                  <Badge variant="default" className="font-mono text-sm px-2.5 py-1">
                     {seat.numeroAsiento}
                   </Badge>
                 </div>
@@ -98,12 +116,12 @@ export function TicketDetails({
 
         {/* Código QR */}
         {booking.boleto?.codigoQr && (
-          <div className="space-y-3">
-            <h3 className="text-sm font-semibold text-muted-foreground uppercase flex items-center gap-2">
-              <QrCode className="h-4 w-4" />
+          <div className="space-y-3 p-4 rounded-lg bg-muted/30 border border-border">
+            <h3 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
+              <QrCode className="h-4 w-4 text-primary" />
               Código QR
             </h3>
-            <div className="flex justify-center p-4 rounded-lg border border-border bg-muted/20">
+            <div className="flex justify-center p-6 rounded-xl border-2 border-dashed border-border bg-background">
               <img
                 src={booking.boleto.codigoQr}
                 alt="Código QR del boleto"

@@ -41,13 +41,16 @@ export function DestinationSelector({
           Destino <span className="text-destructive">*</span>
         </Label>
         <div className="relative">
-          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
           <Select
             id="destinoIntermedio"
             name="destinoIntermedio"
             value={destinoSeleccionado}
             onChange={(e) => onDestinoChange(e.target.value)}
-            className={errors?.destinoIntermedio ? 'border-destructive' : ''}
+            className={cn(
+              errors?.destinoIntermedio ? 'border-destructive' : '',
+              'pl-10'
+            )}
           >
             <option value="">Selecciona un destino</option>
             {destinos.map((destino) => (

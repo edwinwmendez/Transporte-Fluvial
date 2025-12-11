@@ -77,6 +77,17 @@ export function SeatMap({
     return 'available';
   };
 
+  const getSeatClasses = (state: 'available' | 'partial' | 'sold' | 'selected') => {
+    const base = 'relative w-12 h-12 rounded-md border-2 transition-all flex items-center justify-center text-xs font-semibold';
+    const variants = {
+      available: 'bg-[hsl(var(--seat-available-bg))] border-[hsl(var(--seat-available-border))] text-[hsl(var(--seat-available-text))] hover:opacity-80',
+      partial: 'bg-[hsl(var(--seat-partial-bg))] border-[hsl(var(--seat-partial-border))] text-[hsl(var(--seat-partial-text))] hover:opacity-80',
+      sold: 'bg-[hsl(var(--seat-sold-bg))] border-[hsl(var(--seat-sold-border))] text-[hsl(var(--seat-sold-text))] cursor-not-allowed opacity-60',
+      selected: 'bg-[hsl(var(--seat-selected-bg))] border-[hsl(var(--seat-selected-border))] text-[hsl(var(--seat-selected-text))] ring-2 ring-primary',
+    };
+    return cn(base, variants[state]);
+  };
+
   const renderRow = (rowNumber: number) => {
     const seatsA = getSeatsByRowAndColumn(rowNumber, 'A');
     const seatsB = getSeatsByRowAndColumn(rowNumber, 'B');
@@ -92,17 +103,7 @@ export function SeatMap({
               <button
                 key={seat.id}
                 onClick={() => onSeatClick(seat)}
-                className={cn(
-                  'relative w-12 h-12 rounded-md border-2 transition-all flex items-center justify-center text-xs font-semibold',
-                  state === 'available' &&
-                    'bg-green-100 border-green-300 hover:bg-green-200 hover:border-green-400 text-green-800',
-                  state === 'partial' &&
-                    'bg-orange-100 border-orange-300 hover:bg-orange-200 hover:border-orange-400 text-orange-800',
-                  state === 'sold' &&
-                    'bg-red-100 border-red-300 cursor-not-allowed opacity-60 text-red-800',
-                  state === 'selected' &&
-                    'bg-blue-200 border-blue-500 ring-2 ring-blue-400 text-blue-900'
-                )}
+                className={getSeatClasses(state)}
                 disabled={state === 'sold'}
                 aria-label={`Asiento ${seat.numeroAsiento} - ${state === 'available' ? 'Disponible' : state === 'partial' ? 'Parcialmente ocupado' : 'Ocupado'}`}
                 title={`Asiento ${seat.numeroAsiento} - ${reservas.length} reserva${reservas.length !== 1 ? 's' : ''}`}
@@ -133,17 +134,7 @@ export function SeatMap({
               <button
                 key={seat.id}
                 onClick={() => onSeatClick(seat)}
-                className={cn(
-                  'relative w-12 h-12 rounded-md border-2 transition-all flex items-center justify-center text-xs font-semibold',
-                  state === 'available' &&
-                    'bg-green-100 border-green-300 hover:bg-green-200 hover:border-green-400 text-green-800',
-                  state === 'partial' &&
-                    'bg-orange-100 border-orange-300 hover:bg-orange-200 hover:border-orange-400 text-orange-800',
-                  state === 'sold' &&
-                    'bg-red-100 border-red-300 cursor-not-allowed opacity-60 text-red-800',
-                  state === 'selected' &&
-                    'bg-blue-200 border-blue-500 ring-2 ring-blue-400 text-blue-900'
-                )}
+                className={getSeatClasses(state)}
                 disabled={state === 'sold'}
                 aria-label={`Asiento ${seat.numeroAsiento} - ${state === 'available' ? 'Disponible' : state === 'partial' ? 'Parcialmente ocupado' : 'Ocupado'}`}
                 title={`Asiento ${seat.numeroAsiento} - ${reservas.length} reserva${reservas.length !== 1 ? 's' : ''}`}
@@ -167,10 +158,20 @@ export function SeatMap({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4" />
-          <p className="text-sm text-muted-foreground">Cargando mapa de asientos...</p>
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center gap-4 text-xs">
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded border-2 bg-muted animate-pulse" />
+            <span className="text-muted-foreground">Cargando...</span>
+          </div>
+        </div>
+        <div className="border rounded-lg p-4 bg-muted/20">
+          <div className="flex items-center justify-center py-12">
+            <div className="text-center space-y-3">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+              <p className="text-sm text-muted-foreground">Cargando mapa de asientos...</p>
+            </div>
+          </div>
         </div>
       </div>
     );
@@ -181,19 +182,19 @@ export function SeatMap({
       {/* Leyenda */}
       <div className="flex flex-wrap items-center gap-4 text-xs">
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2 bg-green-100 border-green-300" />
+          <div className="w-4 h-4 rounded border-2 bg-[hsl(var(--seat-available-bg))] border-[hsl(var(--seat-available-border))]" />
           <span>Disponible</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2 bg-orange-100 border-orange-300" />
+          <div className="w-4 h-4 rounded border-2 bg-[hsl(var(--seat-partial-bg))] border-[hsl(var(--seat-partial-border))]" />
           <span>Parcialmente Ocupado</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2 bg-red-100 border-red-300 opacity-60" />
+          <div className="w-4 h-4 rounded border-2 bg-[hsl(var(--seat-sold-bg))] border-[hsl(var(--seat-sold-border))] opacity-60" />
           <span>Completamente Ocupado</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="w-4 h-4 rounded border-2 bg-blue-200 border-blue-500" />
+          <div className="w-4 h-4 rounded border-2 bg-[hsl(var(--seat-selected-bg))] border-[hsl(var(--seat-selected-border))]" />
           <span>Seleccionado</span>
         </div>
       </div>

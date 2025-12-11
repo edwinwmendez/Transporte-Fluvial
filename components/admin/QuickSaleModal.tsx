@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Loader2, Ticket, Wallet } from 'lucide-react';
 import { useBookingForm } from '@/lib/hooks/useBookingForm';
 import { useTicketGeneration } from '@/lib/hooks/useTicketGeneration';
@@ -143,55 +144,98 @@ export function QuickSaleModal({
       const monto = parseFloat(sanitizedData.monto);
 
       // Upload screenshot si es necesario
+      // NOTA: El screenshot se sube ANTES de crear el booking, usando un ID temporal
+      // Una vez creado el booking, el archivo ya está en Storage con el path correcto
       let screenshotData: { url: string; path: string } | null = null;
       if (
         (sanitizedData.metodoPago === 'yape' || sanitizedData.metodoPago === 'plin') &&
         screenshotFile
       ) {
-        const tempId = `temp_${Date.now()}`;
-        screenshotData = await uploadScreenshot(screenshotFile, tripId, tempId);
+        try {
+          console.log('[QuickSale] Iniciando subida de screenshot', { tripId, metodoPago: sanitizedData.metodoPago, fileName: screenshotFile.name });
+          const tempId = `temp_${Date.now()}`;
+          screenshotData = await uploadScreenshot(screenshotFile, tripId, tempId);
+          console.log('[QuickSale] Screenshot subido exitosamente', { url: screenshotData.url, path: screenshotData.path });
+        } catch (uploadError) {
+          console.error('[QuickSale] Error al subir screenshot', uploadError);
+          logError('Error al subir screenshot', uploadError, { tripId });
+          toast.error('Error al subir el comprobante. La venta se registrará sin comprobante.');
+          // Continuar sin screenshot - no es crítico para crear el booking
+        }
+      } else if ((sanitizedData.metodoPago === 'yape' || sanitizedData.metodoPago === 'plin') && !screenshotFile) {
+        console.warn('[QuickSale] Método de pago YAPE/PLIN sin screenshot - continuando sin comprobante');
       }
 
       // Generar ticket y QR
-      const { numeroTicket, codigoQr } = await generateTicket({
-        viajeId: tripId,
-        asientoId: seat.id,
-        dniPasajero: sanitizedData.dni,
-        asientoNumero: seat.numeroAsiento,
-      });
+      console.log('[QuickSale] Iniciando generación de ticket', { tripId, seatId: seat.id });
+      let numeroTicket: string;
+      let codigoQr: string;
+      try {
+        const ticketData = await generateTicket({
+          viajeId: tripId,
+          asientoId: seat.id,
+          dniPasajero: sanitizedData.dni,
+          asientoNumero: seat.numeroAsiento,
+        });
+        numeroTicket = ticketData.numeroTicket;
+        codigoQr = ticketData.codigoQr;
+        console.log('[QuickSale] Ticket generado exitosamente', { numeroTicket });
+      } catch (ticketError) {
+        console.error('[QuickSale] Error al generar ticket', ticketError);
+        logError('Error al generar ticket', ticketError, { tripId, seatId: seat.id });
+        throw new Error('Error al generar el ticket. Por favor, intenta nuevamente.');
+      }
 
       // Crear reserva
-      const bookingId = await createBookingMutation.mutateAsync({
-        viajeId: tripId,
-        asientoId: seat.id,
-        datosPasajero: {
-          nombre: sanitizedData.nombre,
-          dni: sanitizedData.dni,
-          telefono: sanitizedData.telefono,
-          whatsapp: sanitizedData.whatsapp || undefined,
-          destinoIntermedio:
-            sanitizedData.destinoIntermedio && sanitizedData.destinoIntermedio !== rutaActual.destino
-              ? sanitizedData.destinoIntermedio
-              : undefined,
-          monto,
-          metodoPago: sanitizedData.metodoPago,
-          origenIntermedio: puntoOrigen !== rutaActual.origen ? puntoOrigen : undefined,
-          screenshotUrl: screenshotData?.url,
-          screenshotPath: screenshotData?.path,
-        },
-        ruta: rutaActual,
-      });
+      console.log('[QuickSale] Iniciando creación de reserva', { tripId, seatId: seat.id });
+      let bookingId: string;
+      try {
+        bookingId = await createBookingMutation.mutateAsync({
+          viajeId: tripId,
+          asientoId: seat.id,
+          datosPasajero: {
+            nombre: sanitizedData.nombre,
+            dni: sanitizedData.dni,
+            telefono: sanitizedData.telefono,
+            whatsapp: sanitizedData.whatsapp || undefined,
+            destinoIntermedio:
+              sanitizedData.destinoIntermedio && sanitizedData.destinoIntermedio !== rutaActual.destino
+                ? sanitizedData.destinoIntermedio
+                : undefined,
+            monto,
+            metodoPago: sanitizedData.metodoPago,
+            origenIntermedio: puntoOrigen !== rutaActual.origen ? puntoOrigen : undefined,
+            screenshotUrl: screenshotData?.url,
+            screenshotPath: screenshotData?.path,
+          },
+          ruta: rutaActual,
+        });
+        console.log('[QuickSale] Reserva creada exitosamente', { bookingId });
+      } catch (bookingError) {
+        console.error('[QuickSale] Error al crear reserva', bookingError);
+        logError('Error al crear reserva', bookingError, { tripId, seatId: seat.id });
+        throw bookingError;
+      }
 
       // Actualizar reserva con boleto
-      await updateBookingTicketMutation.mutateAsync({
-        bookingId,
-        boleto: {
-          numeroTicket,
-          codigoQr,
-          estado: 'emitido',
-          emitidoEn: Timestamp.now(),
-        },
-      });
+      console.log('[QuickSale] Iniciando actualización de boleto', { bookingId });
+      try {
+        await updateBookingTicketMutation.mutateAsync({
+          bookingId,
+          boleto: {
+            numeroTicket,
+            codigoQr,
+            estado: 'emitido',
+            emitidoEn: Timestamp.now(),
+          },
+        });
+        console.log('[QuickSale] Boleto actualizado exitosamente', { bookingId, numeroTicket });
+      } catch (updateError) {
+        console.error('[QuickSale] Error al actualizar boleto', updateError);
+        logError('Error al actualizar boleto', updateError, { bookingId });
+        // No lanzar error aquí, la reserva ya está creada
+        toast.error('La reserva se creó pero hubo un error al actualizar el boleto.');
+      }
 
       // Construir bookingData para preview
       const bookingData: Booking = {
@@ -261,11 +305,11 @@ export function QuickSaleModal({
                 <Ticket className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                 Emisión de Boleto
               </DialogTitle>
-              <DialogDescription className="mt-1 sm:mt-2 flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-md bg-primary/10 text-primary text-xs font-semibold border border-primary/20">
+              <div className="mt-2 sm:mt-3 flex items-center gap-2">
+                <Badge variant="default" className="px-3 py-1.5 text-xs font-bold tracking-wide">
                   ASIENTO {seat.numeroAsiento}
-                </span>
-              </DialogDescription>
+                </Badge>
+              </div>
             </DialogHeader>
           </div>
 
@@ -280,9 +324,9 @@ export function QuickSaleModal({
               />
 
               {puntoOrigen && puntoOrigen !== rutaActual?.origen && (
-                <div className="text-xs px-2 py-1 bg-info/10 text-info rounded-md inline-block border border-info/20">
-                  Desde: <b>{puntoOrigen}</b>
-                </div>
+                <Badge variant="info" className="text-xs font-medium">
+                  Desde: {puntoOrigen}
+                </Badge>
               )}
 
               <DestinationSelector
@@ -294,7 +338,7 @@ export function QuickSaleModal({
                 errors={errors}
               />
 
-              <div className="bg-muted/30 p-4 rounded-lg border border-border space-y-4">
+              <div className="bg-gradient-to-br from-muted/50 to-muted/30 p-5 rounded-xl border-2 border-border space-y-4 shadow-sm">
                 <PaymentMethodSelector
                   metodoPago={formData.metodoPago}
                   onSelect={(method) => updateField('metodoPago', method)}

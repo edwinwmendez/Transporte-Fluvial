@@ -51,25 +51,27 @@ export function EmptyState({
   className,
 }: EmptyStateProps) {
   return (
-    <Card className={cn('', className)} role="status" aria-live="polite">
+    <Card className={cn('border-dashed', className)} role="status" aria-live="polite">
       <CardContent className="pt-6">
-        <div className="text-center py-8">
-          <Icon 
-            className="h-12 w-12 text-muted-foreground mx-auto mb-4" 
-            aria-hidden="true"
-          />
-          <h3 className="text-muted-foreground font-medium" id="empty-state-title">
+        <div className="text-center py-12">
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/50 mb-6">
+            <Icon 
+              className="h-8 w-8 text-muted-foreground" 
+              aria-hidden="true"
+            />
+          </div>
+          <h3 className="text-lg font-semibold text-foreground mb-2" id="empty-state-title">
             {title}
           </h3>
           {description && (
-            <p className="text-sm text-muted-foreground mt-2" aria-describedby="empty-state-title">
+            <p className="text-sm text-muted-foreground max-w-md mx-auto mt-2" aria-describedby="empty-state-title">
               {description}
             </p>
           )}
           {action && (
             <Button 
               onClick={action.onClick} 
-              className="mt-4"
+              className="mt-6"
               aria-label={action.label}
             >
               {action.label}

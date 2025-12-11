@@ -28,11 +28,11 @@ export function TicketActions({
   hasPDF = false,
 }: TicketActionsProps) {
   return (
-    <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-border">
+    <div className="flex flex-col sm:flex-row gap-3 pt-5 border-t-2 border-border bg-muted/20 -mx-6 -mb-6 px-6 pb-6 sm:rounded-b-lg">
       {hasPDF && (
         <Button
           variant="outline"
-          className="flex-1"
+          className="flex-1 hover:bg-primary/5 hover:border-primary/30 transition-all"
           onClick={onDownload}
           disabled={loading}
           aria-label="Descargar PDF del boleto"
@@ -43,7 +43,7 @@ export function TicketActions({
       )}
       <Button
         variant="outline"
-        className="flex-1"
+        className="flex-1 hover:bg-primary/5 hover:border-primary/30 transition-all"
         onClick={onPrint}
         disabled={loading}
         aria-label="Imprimir boleto"
@@ -53,7 +53,7 @@ export function TicketActions({
       </Button>
       <Button
         variant="outline"
-        className="flex-1"
+        className="flex-1 hover:bg-primary/5 hover:border-primary/30 transition-all"
         onClick={onShare}
         disabled={loading}
         aria-label="Compartir boleto por WhatsApp"
@@ -63,7 +63,7 @@ export function TicketActions({
       </Button>
       {canMarkAsUsed && onMarkAsUsed && (
         <Button
-          className="flex-1"
+          className="flex-1 hover:shadow-md transition-all"
           onClick={onMarkAsUsed}
           disabled={marking || loading}
           aria-label="Marcar boleto como usado"

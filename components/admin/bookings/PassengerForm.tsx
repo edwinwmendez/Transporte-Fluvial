@@ -3,6 +3,7 @@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { User, Phone, MessageCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { BookingFormData, BookingFormErrors } from '@/lib/hooks/useBookingForm';
 
 interface PassengerFormProps {
@@ -32,7 +33,7 @@ export function PassengerForm({
             DNI <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               id="dni"
               name="dni"
@@ -42,11 +43,14 @@ export function PassengerForm({
               onChange={(e) => onFieldChange('dni', e.target.value)}
               onBlur={onDniBlur}
               placeholder="12345678"
-              className={errors.dni ? 'border-destructive' : ''}
+              className={cn(
+                errors.dni ? 'border-destructive' : '',
+                'pl-10'
+              )}
               disabled={buscandoPasajero}
             />
             {buscandoPasajero && (
-              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground pointer-events-none z-10" />
             )}
           </div>
           {errors.dni && <p className="text-sm text-destructive">{errors.dni}</p>}
@@ -58,7 +62,7 @@ export function PassengerForm({
             Nombre Completo <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
-            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               id="nombre"
               name="nombre"
@@ -66,7 +70,10 @@ export function PassengerForm({
               value={formData.nombre}
               onChange={(e) => onFieldChange('nombre', e.target.value)}
               placeholder="Juan Pérez"
-              className={errors.nombre ? 'border-destructive' : ''}
+              className={cn(
+                errors.nombre ? 'border-destructive' : '',
+                'pl-10'
+              )}
             />
           </div>
           {errors.nombre && <p className="text-sm text-destructive">{errors.nombre}</p>}
@@ -78,7 +85,7 @@ export function PassengerForm({
             Teléfono <span className="text-destructive">*</span>
           </Label>
           <div className="relative">
-            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               id="telefono"
               name="telefono"
@@ -87,7 +94,10 @@ export function PassengerForm({
               value={formData.telefono}
               onChange={(e) => onFieldChange('telefono', e.target.value)}
               placeholder="987654321"
-              className={errors.telefono ? 'border-destructive' : ''}
+              className={cn(
+                errors.telefono ? 'border-destructive' : '',
+                'pl-10'
+              )}
             />
           </div>
           {errors.telefono && <p className="text-sm text-destructive">{errors.telefono}</p>}
@@ -99,7 +109,7 @@ export function PassengerForm({
             WhatsApp
           </Label>
           <div className="relative">
-            <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <MessageCircle className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               id="whatsapp"
               name="whatsapp"
@@ -108,7 +118,10 @@ export function PassengerForm({
               value={formData.whatsapp}
               onChange={(e) => onFieldChange('whatsapp', e.target.value)}
               placeholder="987654321"
-              className={errors.whatsapp ? 'border-destructive' : ''}
+              className={cn(
+                errors.whatsapp ? 'border-destructive' : '',
+                'pl-10'
+              )}
             />
           </div>
           {errors.whatsapp && <p className="text-sm text-destructive">{errors.whatsapp}</p>}

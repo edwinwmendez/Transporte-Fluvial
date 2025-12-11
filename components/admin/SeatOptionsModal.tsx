@@ -161,8 +161,8 @@ export function SeatOptionsModal({
                     <Card
                       key={booking.id}
                       className={cn(
-                        'hover:bg-muted/50 transition-colors cursor-pointer',
-                        selectedBooking?.id === booking.id && 'ring-2 ring-primary'
+                        'hover:bg-muted/50 hover:shadow-md hover:border-primary/20 transition-all duration-200 cursor-pointer',
+                        selectedBooking?.id === booking.id && 'ring-2 ring-primary border-primary/30 shadow-md'
                       )}
                       onClick={() => handleViewTicket(booking)}
                       role="button"
@@ -268,11 +268,14 @@ export function SeatOptionsModal({
 
             {/* Opción para agregar nuevo pasajero (solo para asientos parciales) */}
             {!isCompletelyOccupied && (
-              <Card className="border-dashed border-2 border-primary/30 bg-primary/5">
+              <Card className="border-dashed border-2 border-primary/40 bg-gradient-to-br from-primary/10 to-primary/5 hover:border-primary/60 hover:shadow-md transition-all duration-200">
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-lg mb-2">Agregar Nuevo Pasajero</CardTitle>
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <CardTitle className="text-lg mb-2 flex items-center gap-2">
+                        <Plus className="h-5 w-5 text-primary" />
+                        Agregar Nuevo Pasajero
+                      </CardTitle>
                       <CardDescription className="text-sm text-muted-foreground">
                         Registra una venta para un tramo diferente en este asiento
                       </CardDescription>

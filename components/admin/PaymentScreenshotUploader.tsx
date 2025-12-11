@@ -172,17 +172,18 @@ export function PaymentScreenshotUploader({
 
       {/* Preview de imagen */}
       {preview && (
-        <div className="relative rounded-lg border-2 border-border overflow-hidden bg-muted/20">
+        <div className="relative rounded-xl border-2 border-border overflow-hidden bg-gradient-to-br from-muted/30 to-muted/10 shadow-md">
           <img
             src={preview}
             alt="Preview del comprobante"
-            className="w-full h-48 object-contain"
+            className="w-full h-48 object-contain bg-background"
           />
           <button
             type="button"
             onClick={handleRemove}
             disabled={uploading}
-            className="absolute top-2 right-2 p-1.5 rounded-full bg-background border border-border hover:bg-error/10 hover:border-error transition-colors"
+            className="absolute top-3 right-3 p-2 rounded-full bg-background/95 backdrop-blur-sm border-2 border-border hover:bg-error/10 hover:border-error transition-all shadow-lg touch-target"
+            aria-label="Eliminar imagen"
           >
             <X className="w-4 h-4 text-foreground" />
           </button>
@@ -214,11 +215,11 @@ export function PaymentScreenshotUploader({
 
       {/* Mensaje informativo */}
       {preview && file && (!bookingId || !onUploadSuccess) && (
-        <div className="rounded-lg bg-blue-50 border border-blue-200 p-2.5 space-y-1">
-          <p className="text-xs font-semibold text-blue-900">
+        <div className="rounded-lg bg-info/10 border border-info/20 p-2.5 space-y-1">
+          <p className="text-xs font-semibold text-info">
             ✓ Comprobante listo para subir
           </p>
-          <p className="text-xs text-blue-700 leading-relaxed">
+          <p className="text-xs text-info/80 leading-relaxed">
             El comprobante y la boleta se guardarán al confirmar la venta. 
             El pago quedará <span className="font-semibold">pendiente</span> hasta que el administrador lo valide.
           </p>

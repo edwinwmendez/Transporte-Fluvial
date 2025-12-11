@@ -3,7 +3,9 @@
 import { useState } from 'react';
 import { useBookingsSubscription } from '@/lib/hooks/useBookings';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Receipt, DollarSign, Wallet, CreditCard, Coins, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Receipt, DollarSign, Coins, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { CashIcon, YapeIcon, PlinIcon } from '@/components/ui/payment-icons';
 import { cn } from '@/lib/utils';
 
 interface CashSummaryCardProps {
@@ -47,40 +49,49 @@ export function CashSummaryCard({ tripId }: CashSummaryCardProps) {
   };
 
   return (
-    <Card className="border-border bg-background shadow-sm overflow-hidden">
-      <CardHeader className="pb-4 bg-muted/20 border-b border-border">
-        <CardTitle className="flex items-center gap-2 text-xl text-foreground">
-          <div className="p-2 bg-primary/10 rounded-lg border border-primary/20">
+    <Card className="border-2 border-border bg-background shadow-lg overflow-hidden">
+      <CardHeader className="pb-5 bg-gradient-to-r from-primary/10 via-primary/5 to-muted/20 border-b-2 border-border">
+        <CardTitle className="flex items-center gap-3 text-xl text-foreground">
+          <div className="p-2.5 bg-primary/15 rounded-xl border-2 border-primary/30 shadow-sm">
             <Receipt className="h-5 w-5 text-primary" />
           </div>
-          Cuadre de Caja
+          <span>Cuadre de Caja</span>
         </CardTitle>
-        <CardDescription>Total recaudado en tiempo real</CardDescription>
+        <CardDescription className="mt-2 text-muted-foreground font-medium">
+          Total recaudado en tiempo real
+        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-6 pt-6">
         {loading ? (
-          <div className="text-center py-8 text-muted-foreground animate-pulse">
-            Cargando información de caja...
+          <div className="space-y-4">
+            <div className="h-20 bg-muted animate-pulse rounded-xl" />
+            <div className="space-y-3">
+              <div className="h-16 bg-muted animate-pulse rounded-xl" />
+              <div className="h-16 bg-muted animate-pulse rounded-xl" />
+              <div className="h-16 bg-muted animate-pulse rounded-xl" />
+            </div>
           </div>
         ) : (
           <>
-            {/* Total General - limpio, SIN gradiente */}
-            <div className="relative overflow-hidden rounded-xl bg-primary/5 p-6 border border-primary/20">
+            {/* Total General - diseño mejorado */}
+            <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/10 via-primary/5 to-background p-6 border-2 border-primary/30 shadow-md">
               <div className="relative z-10">
-                <div className="flex items-center gap-2 mb-1 text-muted-foreground text-xs font-semibold uppercase tracking-wide">
-                  <DollarSign className="w-4 h-4" />
+                <div className="flex items-center gap-2 mb-2 text-muted-foreground text-xs font-bold uppercase tracking-wider">
+                  <div className="p-1.5 rounded-lg bg-primary/20">
+                    <DollarSign className="w-3.5 h-3.5 text-primary" />
+                  </div>
                   Total Recaudado
                 </div>
-                <div className="flex items-baseline gap-1">
-                  <span className="text-4xl font-bold text-primary">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-5xl font-extrabold text-primary drop-shadow-sm">
                     {formatCurrency(total)}
                   </span>
                 </div>
-                <div className="mt-3 flex items-center gap-2 text-xs font-medium text-muted-foreground">
-                  <span className="px-2 py-1 rounded-md bg-background border border-border">
+                <div className="mt-4 flex items-center gap-2">
+                  <Badge variant="secondary" className="text-xs font-semibold px-3 py-1">
                     {bookings.length} venta{bookings.length !== 1 ? "s" : ""} registrada{bookings.length !== 1 ? "s" : ""}
-                  </span>
+                  </Badge>
                 </div>
               </div>
             </div>
@@ -92,91 +103,108 @@ export function CashSummaryCard({ tripId }: CashSummaryCardProps) {
               </h4>
 
               {/* Efectivo */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:bg-success/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-success/10 border border-success/20">
-                    <Wallet className="h-4 w-4 text-success" />
+              <div className="flex items-center justify-between p-4 rounded-xl border-2 border-border bg-gradient-to-r from-background to-success/5 hover:border-success/30 hover:shadow-md transition-all duration-200">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-success/10 border-2 border-success/20 shadow-sm">
+                    <CashIcon className="w-6 h-6" />
                   </div>
-                  <span className="text-sm font-medium text-foreground">Efectivo</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-foreground">Efectivo</span>
+                    <span className="text-xs text-muted-foreground">Dinero en efectivo</span>
+                  </div>
                 </div>
-                <span className="font-bold text-foreground">{formatCurrency(byMethod.efectivo)}</span>
+                <span className="font-bold text-lg text-foreground">{formatCurrency(byMethod.efectivo)}</span>
               </div>
 
               {/* YAPE */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:bg-purple-500/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-purple-500/10 border border-purple-500/20">
-                    <CreditCard className="h-4 w-4 text-purple-600" />
+              <div className="flex items-center justify-between p-4 rounded-xl border-2 border-border bg-gradient-to-r from-background to-[hsl(var(--payment-yape))]/5 hover:border-[hsl(var(--payment-yape))]/30 hover:shadow-md transition-all duration-200">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-[hsl(var(--payment-yape))]/10 border-2 border-[hsl(var(--payment-yape))]/20 shadow-sm">
+                    <YapeIcon className="w-6 h-6" />
                   </div>
-                  <span className="text-sm font-medium text-foreground">YAPE</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-foreground">YAPE</span>
+                    <span className="text-xs text-muted-foreground">BCP - Pago digital</span>
+                  </div>
                 </div>
-                <span className="font-bold text-foreground">{formatCurrency(byMethod.yape)}</span>
+                <span className="font-bold text-lg text-foreground">{formatCurrency(byMethod.yape)}</span>
               </div>
 
               {/* PLIN */}
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-background hover:bg-cyan-500/5 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 rounded-md bg-cyan-500/10 border border-cyan-500/20">
-                    <CreditCard className="h-4 w-4 text-cyan-600" />
+              <div className="flex items-center justify-between p-4 rounded-xl border-2 border-border bg-gradient-to-r from-background to-[hsl(var(--payment-plin))]/5 hover:border-[hsl(var(--payment-plin))]/30 hover:shadow-md transition-all duration-200">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 rounded-xl bg-[hsl(var(--payment-plin))]/10 border-2 border-[hsl(var(--payment-plin))]/20 shadow-sm">
+                    <PlinIcon className="w-6 h-6" />
                   </div>
-                  <span className="text-sm font-medium text-foreground">PLIN</span>
+                  <div className="flex flex-col">
+                    <span className="text-sm font-semibold text-foreground">PLIN</span>
+                    <span className="text-xs text-muted-foreground">Interbank - Pago digital</span>
+                  </div>
                 </div>
-                <span className="font-bold text-foreground">{formatCurrency(byMethod.plin)}</span>
+                <span className="font-bold text-lg text-foreground">{formatCurrency(byMethod.plin)}</span>
               </div>
             </div>
 
             {/* Conciliación de efectivo */}
             <div className="mt-6">
-              <div className="rounded-lg border border-border p-4 bg-muted/20">
-                <div className="flex items-center gap-2 mb-3">
-                  <Coins className="w-4 h-4 text-muted-foreground" />
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              <div className="rounded-xl border-2 border-border p-5 bg-gradient-to-br from-muted/30 to-muted/10 shadow-sm">
+                <div className="flex items-center gap-2.5 mb-4">
+                  <div className="p-1.5 rounded-lg bg-muted-foreground/10">
+                    <Coins className="w-4 h-4 text-muted-foreground" />
+                  </div>
+                  <p className="text-xs font-bold text-foreground uppercase tracking-wider">
                     Conciliación de Efectivo
                   </p>
                 </div>
 
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">S/</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-sm font-bold text-foreground px-2 py-2 bg-muted rounded-lg border border-border">S/</span>
                     <input
                       type="number"
                       step="0.01"
                       placeholder="0.00"
                       value={manualCount}
                       onChange={(e) => setManualCount(e.target.value)}
-                      className="flex-1 h-10 rounded-lg border border-border bg-background px-3 py-1 text-sm font-medium focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all"
+                      className="flex-1 h-11 rounded-lg border-2 border-border bg-background px-4 py-2 text-base font-semibold focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all shadow-sm"
                     />
                   </div>
 
                   {/* Resultados de conciliación */}
                   {manualCount !== "" && (
                     <div className={cn(
-                      "rounded-lg p-3 text-sm flex items-center justify-between border",
+                      "rounded-xl p-4 text-sm flex items-center justify-between border-2 shadow-md",
                       difference === 0
-                        ? "bg-success/10 border-success/20 text-success"
+                        ? "bg-gradient-to-r from-success/15 to-success/5 border-success/40 text-success"
                         : difference > 0
-                          ? "bg-info/10 border-info/20 text-info"
-                          : "bg-error/10 border-error/20 text-error"
+                          ? "bg-gradient-to-r from-info/15 to-info/5 border-info/40 text-info"
+                          : "bg-gradient-to-r from-error/15 to-error/5 border-error/40 text-error"
                     )}>
-                      <div className="flex items-center gap-2 font-medium">
+                      <div className="flex items-center gap-3 font-bold">
                         {difference === 0 ? (
                           <>
-                            <CheckCircle2 className="w-4 h-4" />
-                            <span>Cuadre Perfecto</span>
+                            <div className="p-1.5 rounded-full bg-success/20">
+                              <CheckCircle2 className="w-5 h-5" />
+                            </div>
+                            <span className="text-base">Cuadre Perfecto</span>
                           </>
                         ) : difference > 0 ? (
                           <>
-                            <PlusCircle className="w-4 h-4" />
-                            <span>Sobrante</span>
+                            <div className="p-1.5 rounded-full bg-info/20">
+                              <PlusCircle className="w-5 h-5" />
+                            </div>
+                            <span className="text-base">Sobrante</span>
                           </>
                         ) : (
                           <>
-                            <AlertCircle className="w-4 h-4" />
-                            <span>Faltante</span>
+                            <div className="p-1.5 rounded-full bg-error/20">
+                              <AlertCircle className="w-5 h-5" />
+                            </div>
+                            <span className="text-base">Faltante</span>
                           </>
                         )}
                       </div>
-                      <span className="font-bold font-mono text-base">
+                      <span className="font-extrabold font-mono text-xl">
                         {difference > 0 ? "+" : ""}{formatCurrency(difference)}
                       </span>
                     </div>

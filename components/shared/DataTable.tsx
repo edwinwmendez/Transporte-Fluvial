@@ -135,7 +135,7 @@ export function DataTable<T extends Record<string, unknown>>({
     <div className={cn('space-y-4', className)}>
       {searchable && (
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" aria-hidden="true" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" aria-hidden="true" />
           <Input
             placeholder={searchPlaceholder}
             value={searchTerm}
@@ -143,7 +143,7 @@ export function DataTable<T extends Record<string, unknown>>({
               setSearchTerm(e.target.value);
               setCurrentPage(1);
             }}
-            className="pl-9"
+            className="pl-10"
             aria-label="Buscar en la tabla"
             role="searchbox"
           />
