@@ -1,5 +1,6 @@
 import { collection, query, where, getDocs, orderBy, limit, doc, runTransaction } from 'firebase/firestore';
 import { db } from './firebase';
+import { logError } from './utils/logger';
 
 /**
  * Genera un número de boleto único con formato: TKT-YYYYMMDD-NNNN
@@ -10,7 +11,7 @@ import { db } from './firebase';
  *
  * @returns Número de boleto único
  */
-import { formatLocalDate } from './firestore-helpers';
+import { formatLocalDate } from './utils/formatters';
 
 export async function generateTicketNumber(): Promise<string> {
   const hoy = new Date();
@@ -45,7 +46,7 @@ export async function generateTicketNumber(): Promise<string> {
     return `${prefijo}${numeroFormateado}`;
 
   } catch (transactionError) {
-    console.error('Error en contador atómico, usando método de respaldo:', transactionError);
+    logError('Error en contador atómico, usando método de respaldo', transactionError);
 
     // MÉTODO 2 (Fallback): Query del último boleto (menos robusto pero funcional)
     try {
@@ -81,7 +82,7 @@ export async function generateTicketNumber(): Promise<string> {
 
       return `${prefijo}${numeroFormateado}`;
     } catch (queryError) {
-      console.error('Error en método de respaldo:', queryError);
+      logError('Error en método de respaldo', queryError);
       // MÉTODO 3 (Último recurso): Usar UUID parcial aleatorio
       // Esto es mejor que timestamp porque reduce probabilidad de colisión
       const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
@@ -107,7 +108,7 @@ export async function verificarNumeroTicketUnico(numeroTicket: string): Promise<
     const snapshot = await getDocs(q);
     return snapshot.empty;
   } catch (error) {
-    console.error('Error al verificar unicidad del boleto:', error);
+    logError('Error al verificar unicidad del boleto', error);
     // En caso de error, asumir que es único para no bloquear el flujo
     return true;
   }

@@ -1,14 +1,19 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Download, Printer, Share2, X, Loader2 } from "lucide-react";
-import { downloadFile } from "@/lib/storage-helpers";
-import { generateTicketPDF, type TicketData } from "@/lib/ticket-generator";
-import type { Trip, Vessel, Route, Seat, Booking } from "@/lib/firestore-helpers";
-import { getTrip, getVessel, getRoute, getSeatsForTrip } from "@/lib/firestore-helpers";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { X, Loader2 } from 'lucide-react';
+import { downloadFile } from '@/lib/storage-helpers';
+import { generateTicketPDF, type TicketData } from '@/lib/ticket-generator';
+import type { Booking } from '@/lib/types';
+import { useToast } from '@/lib/hooks/useToast';
+import { logError } from '@/lib/utils/logger';
+import { handleError } from '@/lib/utils/error-handler';
+import { useTicketData } from '@/lib/hooks/useTicketData';
+import { TicketDetails } from './bookings/TicketDetails';
+import { TicketActions } from './bookings/TicketActions';
+import { useMarkTicketAsUsed } from '@/lib/hooks/useBookings';
 
 interface TicketPreviewModalProps {
   open: boolean;
@@ -18,6 +23,16 @@ interface TicketPreviewModalProps {
   whatsappPasajero?: string;
 }
 
+/**
+ * Modal para previsualizar y gestionar un boleto digital
+ * 
+ * Permite:
+ * - Ver detalles del boleto (pasajero, viaje, QR)
+ * - Descargar PDF
+ * - Imprimir
+ * - Compartir por WhatsApp
+ * - Marcar como usado (embarcado)
+ */
 export function TicketPreviewModal({
   open,
   onOpenChange,
@@ -25,63 +40,19 @@ export function TicketPreviewModal({
   numeroTicket,
   whatsappPasajero,
 }: TicketPreviewModalProps) {
-  const [trip, setTrip] = useState<Trip | null>(null);
-  const [vessel, setVessel] = useState<Vessel | null>(null);
-  const [route, setRoute] = useState<Route | null>(null);
-  const [seat, setSeat] = useState<Seat | null>(null);
-  const [loading, setLoading] = useState(false);
+  const toast = useToast();
+  const { trip, vessel, route, seat, loading } = useTicketData(booking, open && !!booking);
+  const markTicketAsUsed = useMarkTicketAsUsed();
+
   const [generatingPDF, setGeneratingPDF] = useState(false);
+  const [pdfBlob, setPdfBlob] = useState<Blob | null>(null);
 
-  useEffect(() => {
-    if (open && booking) {
-      loadData();
-    }
-  }, [open, booking]);
-
-  async function loadData() {
-    if (!booking) return;
-
-    try {
-      setLoading(true);
-      const tripData = await getTrip(booking.viajeId);
-      setTrip(tripData);
-
-      if (tripData) {
-        const [vesselData, routeData, seatsData] = await Promise.all([
-          getVessel(tripData.embarcacionId),
-          getRoute(tripData.rutaId),
-          getSeatsForTrip(booking.viajeId),
-        ]);
-        setVessel(vesselData);
-        setRoute(routeData);
-        
-        const foundSeat = seatsData.find(s => s.id === booking.asientoId);
-        if (foundSeat) {
-          setSeat(foundSeat);
-        } else {
-          setSeat({
-            id: booking.asientoId,
-            viajeId: booking.viajeId,
-            numeroAsiento: booking.asientoId.split('_').pop() || 'N/A',
-            fila: 0,
-            columna: 'A',
-            posicion: 'ventana',
-            estado: 'vendido',
-            createdAt: booking.createdAt,
-            updatedAt: booking.updatedAt,
-          } as Seat);
-        }
-      }
-    } catch (error) {
-      console.error("Error al cargar datos:", error);
-    } finally {
-      setLoading(false);
-    }
-  }
+  const boletoEstado = booking?.boleto?.estado || 'emitido';
+  const puedeMarcar = boletoEstado === 'emitido' && booking?.estado !== 'embarcado';
 
   const handleDownload = async () => {
     if (!booking || !trip || !vessel || !route || !seat) {
-      alert("No hay datos suficientes para generar el PDF");
+      toast.error('No hay datos suficientes para generar el PDF');
       return;
     }
 
@@ -107,23 +78,40 @@ export function TicketPreviewModal({
         fechaEmision: booking.boleto?.emitidoEn?.toDate ? booking.boleto.emitidoEn.toDate() : new Date(),
       };
 
-      const pdfBlob = await generateTicketPDF(ticketData);
-      downloadFile(pdfBlob, `boleto_${numeroTicket}.pdf`);
-    } catch (error: any) {
-      console.error("Error al generar PDF:", error);
-      alert(error.message || "Error al generar el PDF del boleto");
+      const blob = await generateTicketPDF(ticketData);
+      setPdfBlob(blob);
+      downloadFile(blob, `boleto_${numeroTicket}.pdf`);
+      toast.success('PDF descargado correctamente');
+    } catch (error) {
+      const message = handleError(error, { action: 'downloadTicketPDF', bookingId: booking?.id });
+      toast.error(message);
     } finally {
       setGeneratingPDF(false);
     }
   };
 
   const handlePrint = () => {
-    window.print();
+    if (pdfBlob) {
+      const url = URL.createObjectURL(pdfBlob);
+      const printWindow = window.open(url);
+      if (printWindow) {
+        printWindow.onload = () => {
+          printWindow.print();
+        };
+      }
+    } else {
+      toast.error('Primero debe generar el PDF');
+    }
   };
 
-  const handleShareWhatsApp = async () => {
-    if (!whatsappPasajero || !booking || !trip || !vessel || !route || !seat) {
-      alert("No hay datos suficientes para generar el PDF");
+  const handleShare = async () => {
+    if (!whatsappPasajero) {
+      toast.error('No hay número de WhatsApp disponible');
+      return;
+    }
+
+    if (!booking || !trip || !vessel || !route || !seat) {
+      toast.error('No hay datos suficientes para compartir');
       return;
     }
 
@@ -149,236 +137,91 @@ export function TicketPreviewModal({
         fechaEmision: booking.boleto?.emitidoEn?.toDate ? booking.boleto.emitidoEn.toDate() : new Date(),
       };
 
-      const pdfBlob = await generateTicketPDF(ticketData);
-
-      const message = encodeURIComponent(
-        `¡Hola! Aquí está tu boleto de viaje número ${numeroTicket}.`
-      );
-      const whatsappUrl = `https://wa.me/${whatsappPasajero.replace(/[^0-9]/g, '')}?text=${message}`;
-      
+      const blob = await generateTicketPDF(ticketData);
+      const url = URL.createObjectURL(blob);
+      const whatsappUrl = `https://wa.me/51${whatsappPasajero}?text=Tu%20boleto%20${numeroTicket}`;
       window.open(whatsappUrl, '_blank');
       
       setTimeout(() => {
-        downloadFile(pdfBlob, `boleto_${numeroTicket}.pdf`);
+        URL.revokeObjectURL(url);
       }, 500);
-    } catch (error: any) {
-      console.error("Error al compartir por WhatsApp:", error);
-      alert(error.message || "Error al generar el PDF para compartir");
+      toast.success('Boleto compartido por WhatsApp');
+    } catch (error) {
+      const message = handleError(error, { action: 'shareTicket', bookingId: booking?.id });
+      toast.error(message);
     } finally {
       setGeneratingPDF(false);
     }
   };
 
-  if (!booking) {
-    return null;
-  }
+  const handleMarkAsUsed = async () => {
+    if (!booking) return;
 
-  const fechaSalida = trip?.fechaSalida?.toDate ? trip.fechaSalida.toDate() : null;
-  const fechaEmision = booking.boleto?.emitidoEn?.toDate ? booking.boleto.emitidoEn.toDate() : new Date();
+    try {
+      await markTicketAsUsed.mutateAsync(booking.id);
+      toast.success('Boleto marcado como usado');
+      onOpenChange(false);
+    } catch (error) {
+      const message = handleError(error, { action: 'markTicketAsUsed', bookingId: booking.id });
+      toast.error(message);
+    }
+  };
+
+  const isLoading = loading || generatingPDF || markTicketAsUsed.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg w-full print:max-w-none print:p-0">
-        <DialogHeader className="print:hidden">
-          <DialogTitle className="text-xl font-bold">Boleto de Viaje</DialogTitle>
-          <DialogDescription className="text-sm">
-            Número: {numeroTicket}
-          </DialogDescription>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-labelledby="ticket-modal-title">
+        <DialogHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <DialogTitle id="ticket-modal-title">Vista Previa del Boleto</DialogTitle>
+              <DialogDescription>
+                {numeroTicket} - {booking?.nombrePasajero}
+              </DialogDescription>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => onOpenChange(false)}
+              aria-label="Cerrar modal"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
 
-        {/* Boleto en HTML - Diseño compacto tipo ticket */}
-        <div className="mt-4 print:mt-0">
-          <div className="border-2 border-gray-800 rounded-sm bg-white shadow-lg print:shadow-none print:border-0 print:rounded-none max-w-[105mm] mx-auto print:max-w-[105mm]">
-            {/* Header compacto - más delgado */}
-            <div className="bg-gray-900 text-white px-2.5 py-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <div>
-                  <div className="font-bold text-xs leading-tight">TRANSPORTE FLUVIAL</div>
-                  <div className="text-[9px] opacity-90">ATALAYA - UCAYALI</div>
-                </div>
-                <div className="text-right">
-                  <div className="text-[8px] opacity-80">BOLETO</div>
-                  <div className="font-mono font-bold text-[10px]">{numeroTicket}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Contenido compacto - más delgado */}
-            <div className="px-2.5 py-2 space-y-1 text-xs">
-              {/* Pasajero - línea compacta */}
-              <div className="border-b border-gray-300 pb-0.5">
-                <div className="text-[8px] font-semibold text-gray-600 uppercase mb-0.5">Pasajero</div>
-                <div className="font-bold text-xs leading-tight">{booking.nombrePasajero.toUpperCase()}</div>
-                <div className="flex gap-2 text-[9px] text-gray-600 mt-0.5">
-                  <span>DNI: {booking.dniPasajero}</span>
-                  <span className="text-gray-400">|</span>
-                  <span>Tel: {booking.telefonoPasajero}</span>
-                </div>
-              </div>
-
-              {/* Viaje - grid compacto */}
-              {trip && vessel && route && (
-                <div className="border-b border-gray-300 pb-0.5">
-                  <div className="text-[8px] font-semibold text-gray-600 uppercase mb-0.5">Viaje</div>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 text-[9px]">
-                    <div>
-                      <span className="text-gray-600">Emb:</span>
-                      <span className="font-semibold ml-1">{vessel.nombre}</span>
-                    </div>
-                    <div>
-                      <span className="text-gray-600">Asiento:</span>
-                      <span className="font-semibold ml-1">{seat?.numeroAsiento || 'N/A'}</span>
-                    </div>
-                    <div className="col-span-2 mt-0.5">
-                      <span className="text-gray-600">Ruta:</span>
-                      <span className="font-bold text-primary ml-1 text-[10px]">
-                        {booking.origenIntermedio || route.origen} → {booking.destinoIntermedio || route.destino}
-                      </span>
-                    </div>
-                    {fechaSalida && (
-                      <div>
-                        <span className="text-gray-600">Fecha:</span>
-                        <span className="font-semibold ml-1">
-                          {fechaSalida.toLocaleDateString('es-PE', { day: '2-digit', month: 'short', year: 'numeric', weekday: 'short' })}
-                        </span>
-                      </div>
-                    )}
-                    <div>
-                      <span className="text-gray-600">Hora:</span>
-                      <span className="font-semibold ml-1">{trip.horaSalida}</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Pago - línea compacta */}
-              <div className="border-b border-gray-300 pb-0.5">
-                <div className="text-[8px] font-semibold text-gray-600 uppercase mb-0.5">Pago</div>
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[9px] text-gray-600">
-                    Método: <span className="font-semibold text-gray-900">{(booking.pago?.metodoPago || 'efectivo').toUpperCase()}</span>
-                  </span>
-                  <span className="text-base font-bold text-gray-900">
-                    S/ {(booking.pago?.monto || 0).toFixed(2)}
-                  </span>
-                </div>
-                {/* Estado de validación */}
-                {booking.pago?.estado && (
-                  <div className="flex items-center gap-1">
-                    <span className="text-[8px] text-gray-600">Estado:</span>
-                    <span className={cn(
-                      "text-[8px] font-semibold px-1 py-0.5 rounded",
-                      booking.pago.estado === 'validado' && "bg-green-100 text-green-700",
-                      booking.pago.estado === 'pendiente' && "bg-amber-100 text-amber-700",
-                      booking.pago.estado === 'rechazado' && "bg-red-100 text-red-700"
-                    )}>
-                      {booking.pago.estado === 'validado' ? '✓ VALIDADO' : 
-                       booking.pago.estado === 'pendiente' ? '⏳ PENDIENTE' : 
-                       '✗ RECHAZADO'}
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Instrucciones y QR lado a lado */}
-              <div className="flex items-start gap-2 pt-0.5">
-                {/* Instrucciones a la izquierda */}
-                <div className="flex-1">
-                  <div className="text-[8px] font-semibold text-gray-600 uppercase mb-0.5">Instrucciones</div>
-                  <ul className="text-[8px] text-gray-700 space-y-0 leading-tight">
-                    <li>• Presente este boleto al embarque</li>
-                    <li>• Llegue 30 min antes de la salida</li>
-                    <li>• Traiga DNI o Pasaporte</li>
-                  </ul>
-                </div>
-                {/* QR a la derecha */}
-                {booking.boleto?.codigoQr && (
-                  <div className="flex-shrink-0">
-                    <div className="text-[8px] font-semibold text-gray-600 uppercase mb-0.5 text-center">QR</div>
-                    <img
-                      src={booking.boleto.codigoQr}
-                      alt="QR"
-                      className="w-16 h-16 border border-gray-300"
-                    />
-                  </div>
-                )}
-              </div>
-
-              {/* Footer compacto - más delgado */}
-              <div className="pt-0.5 text-center">
-                <div className="text-[7px] text-gray-500">
-                  Emitido: {fechaEmision.toLocaleDateString('es-PE', {
-                    day: '2-digit',
-                    month: 'short',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
-                </div>
-              </div>
-            </div>
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
           </div>
-        </div>
+        ) : booking && trip && vessel && route && seat ? (
+          <div className="space-y-6">
+            <TicketDetails
+              booking={booking}
+              trip={trip}
+              vessel={vessel}
+              route={route}
+              seat={seat}
+              numeroTicket={numeroTicket}
+            />
 
-        {/* Botones de acción */}
-        <div className="flex gap-2 mt-4 print:hidden">
-          <Button
-            variant="outline"
-            onClick={handleDownload}
-            disabled={generatingPDF || !trip || !vessel || !route || !seat}
-            className="flex-1"
-            size="sm"
-          >
-            {generatingPDF ? (
-              <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                Generando...
-              </>
-            ) : (
-              <>
-                <Download className="h-4 w-4 mr-2" />
-                Descargar PDF
-              </>
-            )}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handlePrint}
-            className="flex-1"
-            size="sm"
-          >
-            <Printer className="h-4 w-4 mr-2" />
-            Imprimir
-          </Button>
-          {whatsappPasajero && (
-            <Button
-              variant="outline"
-              onClick={handleShareWhatsApp}
-              disabled={generatingPDF || !trip || !vessel || !route || !seat}
-              className="flex-1"
-              size="sm"
-            >
-              {generatingPDF ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  Preparando...
-                </>
-              ) : (
-                <>
-                  <Share2 className="h-4 w-4 mr-2" />
-                  WhatsApp
-                </>
-              )}
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onOpenChange(false)}
-          >
-            <X className="h-4 w-4" />
-          </Button>
-        </div>
+            <TicketActions
+              onDownload={handleDownload}
+              onPrint={handlePrint}
+              onShare={handleShare}
+              onMarkAsUsed={puedeMarcar ? handleMarkAsUsed : undefined}
+              canMarkAsUsed={puedeMarcar}
+              loading={isLoading}
+              marking={markTicketAsUsed.isPending}
+              hasPDF={!!booking.boleto?.pdfUrl}
+            />
+          </div>
+        ) : (
+          <div className="text-center py-8">
+            <p className="text-muted-foreground">No se pudieron cargar los datos del boleto</p>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

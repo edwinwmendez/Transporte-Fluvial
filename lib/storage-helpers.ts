@@ -1,5 +1,6 @@
 import { ref, uploadBytes, getDownloadURL, getBlob, UploadResult } from 'firebase/storage';
 import { storage } from './firebase';
+import { logError, logWarn } from './utils/logger';
 
 /**
  * Sube un screenshot de comprobante de pago a Firebase Storage
@@ -47,7 +48,7 @@ export async function uploadPaymentScreenshot(
       path: storagePath,
     };
   } catch (error) {
-    console.error('Error al subir screenshot:', error);
+    logError('Error al subir screenshot', error, { viajeId, bookingId });
     throw new Error('No se pudo subir el comprobante de pago');
   }
 }
@@ -86,7 +87,7 @@ export async function uploadTicketPDF(
       path: storagePath,
     };
   } catch (error) {
-    console.error('Error al subir PDF del boleto:', error);
+    logError('Error al subir PDF del boleto', error, { viajeId, numeroTicket });
     throw new Error('No se pudo subir el PDF del boleto');
   }
 }
@@ -120,7 +121,7 @@ export async function getFileFromStorage(storagePath: string): Promise<Blob> {
     const blob = await getBlob(storageRef);
     return blob;
   } catch (error) {
-    console.error('Error al obtener archivo desde Storage:', error);
+    logError('Error al obtener archivo desde Storage', error, { storagePath });
     throw new Error('No se pudo obtener el archivo desde Storage');
   }
 }
@@ -142,7 +143,7 @@ export async function getFileFromUrl(
     try {
       return await getFileFromStorage(storagePath);
     } catch (error) {
-      console.warn('Error al obtener archivo usando SDK, intentando con fetch:', error);
+      logWarn('Error al obtener archivo usando SDK, intentando con fetch', { storagePath, error: String(error) });
       // Continuar con fetch como fallback
     }
   }
@@ -163,7 +164,7 @@ export async function getFileFromUrl(
     const blob = await response.blob();
     return blob;
   } catch (error) {
-    console.error('Error al obtener archivo usando fetch:', error);
+    logError('Error al obtener archivo usando fetch', error, { downloadUrl });
     throw new Error('No se pudo obtener el archivo. Verifica que el archivo exista y sea accesible.');
   }
 }

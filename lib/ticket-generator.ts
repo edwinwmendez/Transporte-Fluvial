@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
-import type { Trip, Vessel, Route, Seat } from './firestore-helpers';
+import type { Trip, Vessel, Route, Seat } from './types';
 import { generateTicketQR, type QRTicketData } from './qr-generator';
+import { logError } from './utils/logger';
 
 /**
  * Datos necesarios para generar el boleto
@@ -198,7 +199,7 @@ export async function generateTicketPDF(data: TicketData): Promise<Blob> {
 
     doc.addImage(qrDataUrl, 'PNG', qrX, qrY + 2, qrSize, qrSize);
   } catch (error) {
-    console.error('Error al generar QR:', error);
+    logError('Error al generar QR', error);
   }
 
   // Actualizar yPosition al máximo entre instrucciones y QR

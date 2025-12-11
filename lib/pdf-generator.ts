@@ -1,6 +1,8 @@
-import jsPDF from "jspdf";
-import type { Booking, Trip, Vessel, Seat, Route } from "./firestore-helpers";
-import { getRoute } from "./firestore-helpers";
+import jsPDF from 'jspdf';
+import type { Booking, Trip, Vessel, Seat, Route } from './types';
+import { getRoute } from './api/routes.api';
+import type { FirestoreTimestamp } from './types/common.types';
+import { formatFirestoreDate } from './types/common.types';
 
 interface ManifestData {
   trip: Trip;
@@ -44,9 +46,9 @@ export async function generateManifestPDF(data: ManifestData): Promise<Blob> {
   doc.setFontSize(12);
   doc.setFont("helvetica", "normal");
   
-  const formatDate = (timestamp: any) => {
+  const formatDate = (timestamp: FirestoreTimestamp) => {
     if (!timestamp) return "N/A";
-    const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
+    const date = formatFirestoreDate(timestamp);
     return date.toLocaleDateString("es-PE", {
       day: "2-digit",
       month: "long",

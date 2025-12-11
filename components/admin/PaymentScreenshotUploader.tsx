@@ -96,8 +96,8 @@ export function PaymentScreenshotUploader({
       const { url, path } = await uploadPaymentScreenshot(file, viajeId, bookingId);
       onUploadSuccess?.(url, path);
       // No limpiar preview aquí, se mantiene para confirmación visual
-    } catch (err: any) {
-      const errorMessage = err.message || 'Error al subir el comprobante';
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Error al subir el comprobante';
       setError(errorMessage);
       onUploadError?.(errorMessage);
     } finally {

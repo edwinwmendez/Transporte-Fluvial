@@ -18,9 +18,9 @@ const config: Config = {
         '2xl': '1536px', // Desktop extra grande
       },
       colors: {
-        // Paleta según PRD
+        // Paleta según PRD - Unificada con globals.css
         primary: {
-          DEFAULT: '#0066CC', // Azul río
+          DEFAULT: 'hsl(205 65% 35%)', // #2c6b8e - Azul río amazonas (unificado con globals.css)
           foreground: '#FFFFFF',
         },
         secondary: {

@@ -1,29 +1,26 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { subscribeToBookings } from "@/lib/firestore-helpers";
-import type { Booking } from "@/lib/firestore-helpers";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Receipt, DollarSign, Wallet, CreditCard, Coins, CheckCircle2, AlertCircle, PlusCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from 'react';
+import { useBookingsSubscription } from '@/lib/hooks/useBookings';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Receipt, DollarSign, Wallet, CreditCard, Coins, CheckCircle2, AlertCircle, PlusCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface CashSummaryCardProps {
   tripId: string;
 }
 
+/**
+ * Tarjeta de resumen de caja en tiempo real
+ * 
+ * Muestra:
+ * - Total recaudado
+ * - Desglose por método de pago (efectivo, YAPE, PLIN)
+ * - Conciliación de efectivo (conteo manual vs sistema)
+ */
 export function CashSummaryCard({ tripId }: CashSummaryCardProps) {
-  const [bookings, setBookings] = useState<Booking[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [manualCount, setManualCount] = useState<string>("");
-
-  useEffect(() => {
-    const unsubscribe = subscribeToBookings(tripId, (updatedBookings) => {
-      setBookings(updatedBookings);
-      setLoading(false);
-    });
-
-    return () => unsubscribe();
-  }, [tripId]);
+  const { data: bookings = [], isLoading: loading } = useBookingsSubscription(tripId);
+  const [manualCount, setManualCount] = useState<string>('');
 
   // Calcular totales
   const total = bookings.reduce((sum, booking) => sum + (booking.pago?.monto || 0), 0);

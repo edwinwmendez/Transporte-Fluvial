@@ -1,4 +1,5 @@
 import QRCode from 'qrcode';
+import { logError } from './utils/logger';
 
 /**
  * Datos que se codifican en el QR del boleto
@@ -40,7 +41,7 @@ export async function generateTicketQR(
 
     return qrDataUrl;
   } catch (error) {
-    console.error('Error al generar código QR:', error);
+    logError('Error al generar código QR', error, { data });
     throw new Error('No se pudo generar el código QR del boleto');
   }
 }

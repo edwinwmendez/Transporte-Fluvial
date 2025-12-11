@@ -1,508 +1,89 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import {
-  getAllHorariosRecurrentes,
-  createHorarioRecurrente,
-  updateHorarioRecurrente,
-  deleteHorarioRecurrente,
-  generarViajesDesdeHorario,
-  generarViajesProximoMes,
-  calcularViajesDesdeHorario,
-  getAllRoutes,
-  getAllVessels,
-  parseLocalDate,
-  formatLocalDate,
-} from "@/lib/firestore-helpers";
-import type { HorarioRecurrente, Route, Vessel } from "@/lib/firestore-helpers";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Plus, Pencil, Trash2, Calendar, Play, Clock } from "lucide-react";
-
-// Sistema de notificaciones simple
-const toast = {
-  success: (message: string) => alert(`✅ ${message}`),
-  error: (message: string) => alert(`❌ ${message}`),
-  info: (message: string) => alert(`ℹ️ ${message}`),
-};
-
-const DIAS_SEMANA = [
-  { valor: 0, nombre: "Domingo", abrev: "Dom" },
-  { valor: 1, nombre: "Lunes", abrev: "Lun" },
-  { valor: 2, nombre: "Martes", abrev: "Mar" },
-  { valor: 3, nombre: "Miércoles", abrev: "Mié" },
-  { valor: 4, nombre: "Jueves", abrev: "Jue" },
-  { valor: 5, nombre: "Viernes", abrev: "Vie" },
-  { valor: 6, nombre: "Sábado", abrev: "Sáb" },
-];
+import { useState } from 'react';
+import { useHorarios } from '@/lib/hooks/useSchedules';
+import { useRoutes } from '@/lib/hooks/useRoutes';
+import { useVessels } from '@/lib/hooks/useVessels';
+import { useDeleteHorario, useGenerateTripsNextMonth } from '@/lib/hooks/useSchedules';
+import { HorariosList } from './components/HorariosList';
+import { HorariosToolbar } from './components/HorariosToolbar';
+import { HorarioFormDialog } from './components/HorarioFormDialog';
+import { GenerateTripsDialog } from './components/GenerateTripsDialog';
+import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Plus, Clock, Loader2 } from 'lucide-react';
+import { useToast } from '@/lib/hooks/useToast';
+import type { HorarioRecurrente } from '@/lib/types';
+import { logError } from '@/lib/utils/logger';
 
 export default function HorariosPage() {
-  const [horarios, setHorarios] = useState<HorarioRecurrente[]>([]);
-  const [rutas, setRutas] = useState<Route[]>([]);
-  const [embarcaciones, setEmbarcaciones] = useState<Vessel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const toast = useToast();
+  const { data: horarios = [], isLoading: loadingHorarios, refetch: refetchHorarios } = useHorarios();
+  const { data: rutas = [], isLoading: loadingRutas } = useRoutes();
+  const { data: embarcaciones = [], isLoading: loadingEmbarcaciones } = useVessels();
+  const deleteHorario = useDeleteHorario();
+  const generateNextMonth = useGenerateTripsNextMonth();
+
   const [showDialog, setShowDialog] = useState(false);
   const [showGenerateDialog, setShowGenerateDialog] = useState(false);
   const [showGenerateNextMonthDialog, setShowGenerateNextMonthDialog] = useState(false);
   const [selectedHorario, setSelectedHorario] = useState<HorarioRecurrente | null>(null);
-  const [selectedHorariosNextMonth, setSelectedHorariosNextMonth] = useState<Set<string>>(new Set());
-  const [generating, setGenerating] = useState(false);
-  const [viajesEstimadosHorario, setViajesEstimadosHorario] = useState<number>(0);
-  const [calculandoEstimacionHorario, setCalculandoEstimacionHorario] = useState(false);
-  const [progresoGeneracionHorario, setProgresoGeneracionHorario] = useState<{
-    total: number;
-    completados: number;
-    actual: string;
-    tipo: 'horarios' | 'viajes';
-  } | null>(null);
-  const [formData, setFormData] = useState({
-    nombre: "",
-    rutaId: "",
-    embarcacionId: "",
-    horaSalida: "",
-    diasSemana: [] as number[],
-    activo: true,
-  });
-  const [generateData, setGenerateData] = useState({
-    fechaInicio: "",
-    fechaFin: "",
-  });
-  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  const loading = loadingHorarios || loadingRutas || loadingEmbarcaciones;
+  const rutasActivas = rutas.filter((r) => r.activa);
+  const embarcacionesActivas = embarcaciones.filter((v) => v.activa);
 
-  async function loadData() {
-    try {
-      setLoading(true);
-      const [horariosData, routesData, vesselsData] = await Promise.all([
-        getAllHorariosRecurrentes(),
-        getAllRoutes(),
-        getAllVessels(),
-      ]);
-      setHorarios(horariosData);
-      setRutas(routesData.filter((r) => r.activa));
-      setEmbarcaciones(vesselsData.filter((v) => v.activa));
-    } catch (error) {
-      console.error("Error al cargar datos:", error);
-      toast.error("Error al cargar los datos");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function handleOpenDialog(horario?: HorarioRecurrente) {
-    if (horario) {
-      setSelectedHorario(horario);
-      setFormData({
-        nombre: horario.nombre,
-        rutaId: horario.rutaId,
-        embarcacionId: horario.embarcacionId,
-        horaSalida: horario.horaSalida,
-        diasSemana: horario.diasSemana,
-        activo: horario.activo,
-      });
-    } else {
-      setSelectedHorario(null);
-      setFormData({
-        nombre: "",
-        rutaId: "",
-        embarcacionId: "",
-        horaSalida: "",
-        diasSemana: [],
-        activo: true,
-      });
-    }
+  const handleOpenDialog = (horario?: HorarioRecurrente) => {
+    setSelectedHorario(horario || null);
     setShowDialog(true);
-  }
+  };
 
-  function handleCloseDialog() {
+  const handleCloseDialog = () => {
     setShowDialog(false);
     setSelectedHorario(null);
-  }
+  };
 
-  function toggleDiaSemana(dia: number) {
-    setFormData((prev) => {
-      if (prev.diasSemana.includes(dia)) {
-        return {
-          ...prev,
-          diasSemana: prev.diasSemana.filter((d) => d !== dia),
-        };
-      } else {
-        return {
-          ...prev,
-          diasSemana: [...prev.diasSemana, dia].sort(),
-        };
-      }
-    });
-  }
-
-  async function handleSubmit() {
-    if (
-      !formData.nombre ||
-      !formData.rutaId ||
-      !formData.embarcacionId ||
-      !formData.horaSalida ||
-      formData.diasSemana.length === 0
-    ) {
-      toast.error("Completa todos los campos obligatorios y selecciona al menos un día");
-      return;
-    }
-
-    try {
-      setSaving(true);
-      const horarioData = {
-        nombre: formData.nombre,
-        rutaId: formData.rutaId,
-        embarcacionId: formData.embarcacionId,
-        horaSalida: formData.horaSalida,
-        diasSemana: formData.diasSemana,
-        activo: formData.activo,
-      };
-
-      if (selectedHorario) {
-        await updateHorarioRecurrente(selectedHorario.id, horarioData);
-        toast.success("Horario actualizado exitosamente");
-      } else {
-        await createHorarioRecurrente(horarioData);
-        toast.success("Horario creado exitosamente");
-      }
-
-      handleCloseDialog();
-      loadData();
-    } catch (error) {
-      console.error("Error al guardar horario:", error);
-      toast.error(error instanceof Error ? error.message : "Error al guardar el horario");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(horario: HorarioRecurrente) {
+  const handleDelete = async (horarioId: string) => {
+    const horario = horarios.find((h) => h.id === horarioId);
+    if (!horario) return;
+    
     if (!confirm(`¿Estás seguro de eliminar el horario "${horario.nombre}"?`)) {
       return;
     }
 
     try {
-      await deleteHorarioRecurrente(horario.id);
-      toast.success("Horario eliminado exitosamente");
-      loadData();
-    } catch (error) {
-      console.error("Error al eliminar horario:", error);
-      toast.error(error instanceof Error ? error.message : "Error al eliminar el horario");
-    }
-  }
-
-  // Calcular estimación cuando cambian las fechas
-  useEffect(() => {
-    if (selectedHorario && generateData.fechaInicio && generateData.fechaFin) {
-      calcularEstimacionHorario();
-    } else {
-      setViajesEstimadosHorario(0);
-    }
-  }, [generateData.fechaInicio, generateData.fechaFin, selectedHorario]);
-
-  async function calcularEstimacionHorario() {
-    if (!selectedHorario || !generateData.fechaInicio || !generateData.fechaFin) {
-      setViajesEstimadosHorario(0);
-      return;
-    }
-
-    // Usar parseLocalDate para evitar desfases de timezone
-    const fechaInicio = parseLocalDate(generateData.fechaInicio);
-    const fechaFin = parseLocalDate(generateData.fechaFin);
-
-    if (fechaFin < fechaInicio) {
-      setViajesEstimadosHorario(0);
-      return;
-    }
-
-    try {
-      setCalculandoEstimacionHorario(true);
-      const cantidad = await calcularViajesDesdeHorario(
-        selectedHorario.id,
-        fechaInicio,
-        fechaFin
+      await deleteHorario.mutateAsync(horarioId);
+      toast.success('Horario eliminado exitosamente');
+      refetchHorarios();
+    } catch (err) {
+      logError('Error al eliminar horario', err);
+      toast.error(
+        error instanceof Error ? error.message : 'Error al eliminar el horario'
       );
-      setViajesEstimadosHorario(cantidad);
-    } catch (error) {
-      console.error("Error al calcular estimación:", error);
-      setViajesEstimadosHorario(0);
-    } finally {
-      setCalculandoEstimacionHorario(false);
     }
-  }
+  };
 
-  function handleOpenGenerateDialog(horario: HorarioRecurrente) {
+  const handleGenerate = (horario: HorarioRecurrente) => {
     setSelectedHorario(horario);
-    const hoy = new Date();
-    const proximoMes = new Date(hoy);
-    proximoMes.setMonth(proximoMes.getMonth() + 1);
-    proximoMes.setDate(1);
-
-    const finMes = new Date(proximoMes);
-    finMes.setMonth(finMes.getMonth() + 1);
-    finMes.setDate(0);
-
-    setGenerateData({
-      fechaInicio: formatLocalDate(proximoMes),
-      fechaFin: formatLocalDate(finMes),
-    });
     setShowGenerateDialog(true);
-  }
+  };
 
-  async function handleGenerateTrips() {
-    if (!selectedHorario || !generateData.fechaInicio || !generateData.fechaFin) {
-      toast.error("Completa las fechas de inicio y fin");
-      return;
-    }
-
-    // Usar parseLocalDate para evitar desfases de timezone
-    const fechaInicio = parseLocalDate(generateData.fechaInicio);
-    const fechaFin = parseLocalDate(generateData.fechaFin);
-
-    if (fechaFin < fechaInicio) {
-      toast.error("La fecha de fin debe ser posterior a la fecha de inicio");
-      return;
-    }
-
+  const handleGenerateNextMonth = async () => {
     try {
-      setGenerating(true);
-      const totalEstimado = viajesEstimadosHorario;
-
-      setProgresoGeneracionHorario({
-        total: totalEstimado,
-        completados: 0,
-        actual: `Generando viajes para: ${selectedHorario.nombre}...`,
-        tipo: 'viajes',
-      });
-
-      const viajesCreados = await generarViajesDesdeHorario(
-        selectedHorario.id,
-        fechaInicio,
-        fechaFin,
-        // Callback de progreso en tiempo real
-        (viajesCreadosHastaAhora, total) => {
-          setProgresoGeneracionHorario((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  completados: viajesCreadosHastaAhora,
-                  actual: `Generando viajes para: ${selectedHorario.nombre}... (${viajesCreadosHastaAhora}/${total})`,
-                }
-              : null
-          );
-        }
-      );
-
-      setProgresoGeneracionHorario({
-        total: totalEstimado,
-        completados: viajesCreados.length,
-        actual: `Completado: ${viajesCreados.length} viaje${viajesCreados.length !== 1 ? 's' : ''} generado${viajesCreados.length !== 1 ? 's' : ''}`,
-        tipo: 'viajes',
-      });
-
-      // Pequeño delay para que el usuario vea el progreso completo
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      setProgresoGeneracionHorario(null);
-
-      if (viajesCreados.length === 0) {
-        toast.info("Todos los viajes para este rango ya existen");
-      } else {
-        toast.success(
-          `Se generaron ${viajesCreados.length} viaje${viajesCreados.length !== 1 ? "s" : ""} exitosamente`
-        );
-      }
-
-      setShowGenerateDialog(false);
-      setSelectedHorario(null);
-    } catch (error) {
-      console.error("Error al generar viajes:", error);
-      toast.error(error instanceof Error ? error.message : "Error al generar los viajes");
-      setProgresoGeneracionHorario(null);
-    } finally {
-      setGenerating(false);
-    }
-  }
-
-  function handleOpenGenerateNextMonthDialog() {
-    const horariosActivos = horarios.filter((h) => h.activo);
-    setSelectedHorariosNextMonth(new Set(horariosActivos.map((h) => h.id)));
-    setShowGenerateNextMonthDialog(true);
-  }
-
-  function toggleHorarioNextMonth(horarioId: string) {
-    setSelectedHorariosNextMonth((prev) => {
-      const nuevo = new Set(prev);
-      if (nuevo.has(horarioId)) {
-        nuevo.delete(horarioId);
-      } else {
-        nuevo.add(horarioId);
-      }
-      return nuevo;
-    });
-  }
-
-  function seleccionarTodosHorariosNextMonth() {
-    const horariosActivos = horarios.filter((h) => h.activo);
-    setSelectedHorariosNextMonth(new Set(horariosActivos.map((h) => h.id)));
-  }
-
-  function deseleccionarTodosHorariosNextMonth() {
-    setSelectedHorariosNextMonth(new Set());
-  }
-
-  async function handleGenerateNextMonth() {
-    if (selectedHorariosNextMonth.size === 0) {
-      toast.error("Selecciona al menos un horario");
-      return;
-    }
-
-    const horariosActivos = horarios.filter((h) => h.activo && selectedHorariosNextMonth.has(h.id));
-    if (horariosActivos.length === 0) {
-      toast.error("No hay horarios activos seleccionados");
-      return;
-    }
-
-    try {
-      setGenerating(true);
-      const hoy = new Date();
-      const proximoMes = new Date(hoy);
-      proximoMes.setMonth(proximoMes.getMonth() + 1);
-      proximoMes.setDate(1);
-
-      const finMes = new Date(proximoMes);
-      finMes.setMonth(finMes.getMonth() + 1);
-      finMes.setDate(0);
-
-      let totalGenerados = 0;
-      const resultados: Array<{ nombre: string; cantidad: number }> = [];
-
-      // Calcular total estimado de viajes
-      let totalEstimado = 0;
-      for (const horario of horariosActivos) {
-        const cantidad = await calcularViajesDesdeHorario(horario.id, proximoMes, finMes);
-        totalEstimado += cantidad;
-      }
-
-      setProgresoGeneracionHorario({
-        total: totalEstimado,
-        completados: 0,
-        actual: "Iniciando generación de viajes...",
-        tipo: 'viajes',
-      });
-
-      for (let i = 0; i < horariosActivos.length; i++) {
-        const horario = horariosActivos[i];
-        try {
-          setProgresoGeneracionHorario((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  actual: `Generando viajes para: ${horario.nombre}...`,
-                }
-              : null
-          );
-
-          // Guardar el total antes de empezar este horario para el callback
-          const totalAntesDeEsteHorario = totalGenerados;
-          
-          const viajesCreados = await generarViajesDesdeHorario(
-            horario.id,
-            proximoMes,
-            finMes,
-            // Callback de progreso en tiempo real
-            (viajesCreadosHastaAhora, totalParaEsteHorario) => {
-              setProgresoGeneracionHorario((prev) =>
-                prev
-                  ? {
-                      ...prev,
-                      completados: totalAntesDeEsteHorario + viajesCreadosHastaAhora,
-                      actual: `Generando viajes para: ${horario.nombre}... (${viajesCreadosHastaAhora}/${totalParaEsteHorario})`,
-                    }
-                  : null
-              );
-            }
-          );
-          totalGenerados += viajesCreados.length;
-          if (viajesCreados.length > 0) {
-            resultados.push({ nombre: horario.nombre, cantidad: viajesCreados.length });
-          }
-
-          // Actualizar progreso final para este horario
-          setProgresoGeneracionHorario((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  completados: totalGenerados,
-                  actual: viajesCreados.length > 0
-                    ? `Completado: ${horario.nombre} (${viajesCreados.length} viajes)`
-                    : `Sin viajes nuevos para: ${horario.nombre}`,
-                }
-              : null
-          );
-        } catch (error) {
-          console.error(`Error al generar viajes para ${horario.nombre}:`, error);
-          // No incrementar el contador si hay error, pero actualizar el mensaje
-          setProgresoGeneracionHorario((prev) =>
-            prev
-              ? {
-                  ...prev,
-                  actual: `Error en: ${horario.nombre}`,
-                }
-              : null
-          );
-        }
-      }
-
-      setProgresoGeneracionHorario(null);
-
-      if (totalGenerados === 0) {
-        toast.info("Todos los viajes del próximo mes ya existen");
-      } else {
-        toast.success(
-          `Se generaron ${totalGenerados} viajes en total. ` +
-          `Detalles: ${resultados.map((h) => `${h.nombre}: ${h.cantidad}`).join(", ")}`
-        );
-      }
-
+      await generateNextMonth.mutateAsync();
+      toast.success('Viajes del próximo mes generados exitosamente');
       setShowGenerateNextMonthDialog(false);
-      setSelectedHorariosNextMonth(new Set());
     } catch (error) {
-      console.error("Error al generar viajes del próximo mes:", error);
-      toast.error(error instanceof Error ? error.message : "Error al generar los viajes");
-      setProgresoGeneracionHorario(null);
-    } finally {
-      setGenerating(false);
+      // Error ya manejado en el hook
     }
-  }
-
-  function getDiasSemanaTexto(dias: number[]): string {
-    if (dias.length === 0) return "Sin días";
-    const nombres = dias
-      .map((d) => DIAS_SEMANA.find((ds) => ds.valor === d)?.abrev)
-      .filter(Boolean);
-    return nombres.join(", ");
-  }
+  };
 
   if (loading) {
     return (
-      <div className="flex h-[calc(100vh-8rem)] items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Cargando horarios...</p>
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-muted-foreground" />
+          <p className="text-muted-foreground">Cargando horarios...</p>
         </div>
       </div>
     );
@@ -510,42 +91,26 @@ export default function HorariosPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Horarios Recurrentes</h1>
-          <p className="text-muted-foreground mt-2 text-sm sm:text-base">
-            Define horarios recurrentes para generar viajes automáticamente
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            onClick={handleOpenGenerateNextMonthDialog}
-            disabled={generating || horarios.filter((h) => h.activo).length === 0}
-            className="touch-target"
-          >
-            {generating ? (
-              <Loader2 className="h-4 w-4 sm:mr-2 animate-spin" />
-            ) : (
-              <Calendar className="h-4 w-4 sm:mr-2" />
-            )}
-            <span className="hidden sm:inline">Generar Próximo Mes</span>
-            <span className="sm:hidden">Próximo Mes</span>
-          </Button>
-          <Button onClick={() => handleOpenDialog()} className="touch-target">
-            <Plus className="h-4 w-4 sm:mr-2" />
-            <span className="hidden sm:inline">Nuevo Horario</span>
-            <span className="sm:hidden">Nuevo</span>
-          </Button>
-        </div>
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold">Horarios Recurrentes</h1>
+        <p className="text-muted-foreground mt-2 text-sm sm:text-base">
+          Define horarios recurrentes para generar viajes automáticamente
+        </p>
       </div>
+
+      <HorariosToolbar
+        onAdd={() => handleOpenDialog()}
+        onGenerateNextMonth={() => setShowGenerateNextMonthDialog(true)}
+      />
 
       {horarios.length === 0 ? (
         <Card>
           <CardContent className="pt-6">
             <div className="text-center py-8">
               <Clock className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground">No hay horarios recurrentes registrados</p>
+              <p className="text-muted-foreground">
+                No hay horarios recurrentes registrados
+              </p>
               <p className="text-sm text-muted-foreground mt-2">
                 Crea horarios recurrentes para automatizar la generación de viajes
               </p>
@@ -557,442 +122,67 @@ export default function HorariosPage() {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {horarios.map((horario) => {
-            const ruta = rutas.find((r) => r.id === horario.rutaId);
-            const embarcacion = embarcaciones.find((v) => v.id === horario.embarcacionId);
-
-            return (
-              <Card key={horario.id}>
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <CardTitle className="text-lg">{horario.nombre}</CardTitle>
-                      <CardDescription className="mt-1">
-                        {ruta ? `${ruta.origen} → ${ruta.destino}` : "Ruta no encontrada"}
-                      </CardDescription>
-                    </div>
-                    <div className="flex gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleOpenDialog(horario)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleDelete(horario)}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 text-sm">
-                      <Clock className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Hora:</span>
-                      <span className="font-medium">{horario.horaSalida}</span>
-                    </div>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4 text-muted-foreground" />
-                      <span className="text-muted-foreground">Días:</span>
-                      <span className="font-medium">
-                        {getDiasSemanaTexto(horario.diasSemana)}
-                      </span>
-                    </div>
-                    {embarcacion && (
-                      <div className="flex items-center gap-2 text-sm">
-                        <span className="text-muted-foreground">Embarcación:</span>
-                        <span className="font-medium">{embarcacion.nombre}</span>
-                      </div>
-                    )}
-                    <div className="mt-3 pt-3 border-t">
-                      <span
-                        className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
-                          horario.activo
-                            ? "bg-green-100 text-green-800"
-                            : "bg-gray-100 text-gray-800"
-                        }`}
-                      >
-                        {horario.activo ? "Activo" : "Inactivo"}
-                      </span>
-                    </div>
-                    <div className="mt-3">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => handleOpenGenerateDialog(horario)}
-                        disabled={!horario.activo}
-                      >
-                        <Play className="mr-2 h-4 w-4" />
-                        Generar Viajes
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <HorariosList
+          horarios={horarios}
+          rutas={rutasActivas}
+          embarcaciones={embarcacionesActivas}
+          onEdit={handleOpenDialog}
+          onDelete={handleDelete}
+          onGenerate={handleGenerate}
+        />
       )}
 
-      {/* Dialog de Crear/Editar Horario */}
-      <Dialog open={showDialog} onOpenChange={handleCloseDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>
-              {selectedHorario ? "Editar Horario Recurrente" : "Nuevo Horario Recurrente"}
-            </DialogTitle>
-            <DialogDescription>
-              {selectedHorario
-                ? "Modifica los datos del horario recurrente"
-                : "Define un horario recurrente para generar viajes automáticamente"}
-            </DialogDescription>
-          </DialogHeader>
+      <HorarioFormDialog
+        open={showDialog}
+        horario={selectedHorario}
+        rutas={rutasActivas}
+        embarcaciones={embarcacionesActivas}
+        onClose={handleCloseDialog}
+        onSuccess={refetchHorarios}
+      />
 
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="nombre">Nombre del Horario *</Label>
-              <Input
-                id="nombre"
-                value={formData.nombre}
-                onChange={(e) => setFormData({ ...formData, nombre: e.target.value })}
-                placeholder="Ej: Atalaya-Pucallpa Lunes/Miércoles/Viernes 6AM"
-              />
-              <p className="text-xs text-muted-foreground">
-                Nombre descriptivo para identificar este horario
+      <GenerateTripsDialog
+        open={showGenerateDialog}
+        horario={selectedHorario}
+        onClose={() => {
+          setShowGenerateDialog(false);
+          setSelectedHorario(null);
+        }}
+        onComplete={refetchHorarios}
+      />
+
+      {/* Dialog simplificado para generar próximo mes */}
+      {showGenerateNextMonthDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="max-w-md w-full">
+            <CardContent className="pt-6">
+              <h3 className="text-lg font-semibold mb-4">Generar Viajes del Próximo Mes</h3>
+              <p className="text-sm text-muted-foreground mb-4">
+                Se generarán viajes para todos los horarios activos del próximo mes.
               </p>
-            </div>
-
-            {/* Ruta y Embarcación: 2 columnas desde móviles normales (375px+) */}
-            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="rutaId">Ruta *</Label>
-                <select
-                  id="rutaId"
-                  value={formData.rutaId}
-                  onChange={(e) => setFormData({ ...formData, rutaId: e.target.value })}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowGenerateNextMonthDialog(false)}
+                  className="flex-1"
                 >
-                  <option value="">Selecciona una ruta</option>
-                  {rutas.map((ruta) => (
-                    <option key={ruta.id} value={ruta.id}>
-                      {ruta.origen} → {ruta.destino}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="embarcacionId">Embarcación *</Label>
-                <select
-                  id="embarcacionId"
-                  value={formData.embarcacionId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, embarcacionId: e.target.value })
-                  }
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-base sm:text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring touch-target"
+                  Cancelar
+                </Button>
+                <Button
+                  onClick={handleGenerateNextMonth}
+                  disabled={generateNextMonth.isPending}
+                  className="flex-1"
                 >
-                  <option value="">Selecciona una embarcación</option>
-                  {embarcaciones.map((embarcacion) => (
-                    <option key={embarcacion.id} value={embarcacion.id}>
-                      {embarcacion.nombre} ({embarcacion.capacidad} asientos)
-                    </option>
-                  ))}
-                </select>
+                  {generateNextMonth.isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  Generar
+                </Button>
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="horaSalida">Hora de Salida *</Label>
-              <Input
-                id="horaSalida"
-                type="time"
-                value={formData.horaSalida}
-                onChange={(e) => setFormData({ ...formData, horaSalida: e.target.value })}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label>Días de la Semana *</Label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {DIAS_SEMANA.map((dia) => (
-                  <button
-                    key={dia.valor}
-                    type="button"
-                    onClick={() => toggleDiaSemana(dia.valor)}
-                    className={`rounded-md border px-3 py-2 text-xs sm:text-sm font-medium transition-colors touch-target ${
-                      formData.diasSemana.includes(dia.valor)
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : "bg-background border-input hover:bg-muted"
-                    }`}
-                  >
-                    {dia.abrev}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Seleccionados: {formData.diasSemana.length} día{formData.diasSemana.length !== 1 ? "s" : ""}
-              </p>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <input
-                type="checkbox"
-                id="activo"
-                checked={formData.activo}
-                onChange={(e) => setFormData({ ...formData, activo: e.target.checked })}
-                className="rounded border-gray-300"
-              />
-              <Label htmlFor="activo">Horario activo</Label>
-            </div>
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button variant="outline" onClick={handleCloseDialog} className="w-full sm:w-auto touch-target">
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={saving} className="w-full sm:w-auto touch-target">
-              {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {selectedHorario ? "Actualizar" : "Crear"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog de Generación de Viajes */}
-      <Dialog open={showGenerateDialog} onOpenChange={setShowGenerateDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Generar Viajes desde Horario</DialogTitle>
-            <DialogDescription>
-              Genera viajes automáticamente para el horario:{" "}
-              <strong>{selectedHorario?.nombre}</strong>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {/* Fecha Inicio y Fin: 2 columnas desde móviles normales (375px+) */}
-            <div className="grid grid-cols-1 min-[375px]:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="fechaInicio">Fecha Inicio *</Label>
-                <Input
-                  id="fechaInicio"
-                  type="date"
-                  value={generateData.fechaInicio}
-                  onChange={(e) =>
-                    setGenerateData({ ...generateData, fechaInicio: e.target.value })
-                  }
-                  min={new Date().toISOString().split("T")[0]}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="fechaFin">Fecha Fin *</Label>
-                <Input
-                  id="fechaFin"
-                  type="date"
-                  value={generateData.fechaFin}
-                  onChange={(e) =>
-                    setGenerateData({ ...generateData, fechaFin: e.target.value })
-                  }
-                  min={generateData.fechaInicio || new Date().toISOString().split("T")[0]}
-                />
-              </div>
-            </div>
-
-            {selectedHorario && (
-              <>
-                <div className="rounded-lg border bg-muted/30 p-3">
-                  <p className="text-sm font-medium mb-2">Resumen:</p>
-                  <p className="text-xs text-muted-foreground">
-                    Se generarán viajes para los días:{" "}
-                    <strong>{getDiasSemanaTexto(selectedHorario.diasSemana)}</strong>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Hora: <strong>{selectedHorario.horaSalida}</strong>
-                  </p>
-                </div>
-
-                {/* Estimación de viajes */}
-                {generateData.fechaInicio && generateData.fechaFin && (
-                  <div className="rounded-lg border bg-blue-50 p-3">
-                    {calculandoEstimacionHorario ? (
-                      <div className="flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-                        <p className="text-sm text-blue-800">Calculando cantidad de viajes...</p>
-                      </div>
-                    ) : (
-                      <div>
-                        <p className="text-sm font-medium text-blue-900 mb-1">
-                          Viajes a generar: <span className="text-lg font-bold">{viajesEstimadosHorario}</span>
-                        </p>
-                        <p className="text-xs text-blue-700">
-                          Los viajes que ya existen serán omitidos automáticamente
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Progreso de generación */}
-                {progresoGeneracionHorario && (
-                  <div className="rounded-lg border bg-green-50 p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm font-medium text-green-900">
-                        {progresoGeneracionHorario.actual || "Generando viajes..."}
-                      </p>
-                      <p className="text-sm text-green-700">
-                        {progresoGeneracionHorario.completados} / {progresoGeneracionHorario.total} viajes
-                      </p>
-                    </div>
-                    <div className="w-full bg-green-200 rounded-full h-2">
-                      <div
-                        className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${Math.min((progresoGeneracionHorario.completados / progresoGeneracionHorario.total) * 100, 100)}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowGenerateDialog(false);
-                setSelectedHorario(null);
-                setProgresoGeneracionHorario(null);
-              }}
-              className="w-full sm:w-auto touch-target"
-            >
-              Cancelar
-            </Button>
-            <Button onClick={handleGenerateTrips} disabled={generating || !selectedHorario} className="w-full sm:w-auto touch-target">
-              {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Generar Viajes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog de Generar Próximo Mes */}
-      <Dialog open={showGenerateNextMonthDialog} onOpenChange={setShowGenerateNextMonthDialog}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Generar Viajes del Próximo Mes</DialogTitle>
-            <DialogDescription>
-              Selecciona los horarios para generar viajes del próximo mes automáticamente
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4">
-            {horarios.filter((h) => h.activo).length > 0 ? (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <Label>Seleccionar Horarios ({selectedHorariosNextMonth.size} de {horarios.filter((h) => h.activo).length})</Label>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={seleccionarTodosHorariosNextMonth}
-                    >
-                      Seleccionar Todos
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={deseleccionarTodosHorariosNextMonth}
-                    >
-                      Deseleccionar Todos
-                    </Button>
-                  </div>
-                </div>
-                <div className="rounded-lg border bg-muted/30 p-3 max-h-48 overflow-y-auto">
-                  <div className="space-y-2">
-                    {horarios
-                      .filter((h) => h.activo)
-                      .map((h) => (
-                        <label
-                          key={h.id}
-                          className="flex items-center space-x-2 cursor-pointer hover:bg-muted/50 p-2 rounded"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={selectedHorariosNextMonth.has(h.id)}
-                            onChange={() => toggleHorarioNextMonth(h.id)}
-                            className="rounded border-gray-300"
-                          />
-                          <span className="text-sm">{h.nombre}</span>
-                        </label>
-                      ))}
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-3">
-                <p className="text-sm text-yellow-800">
-                  No hay horarios activos disponibles
-                </p>
-              </div>
-            )}
-
-            {/* Progreso de generación */}
-            {progresoGeneracionHorario && (
-              <div className="rounded-lg border bg-green-50 p-4 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-medium text-green-900">
-                    {progresoGeneracionHorario.actual || "Generando viajes..."}
-                  </p>
-                  <p className="text-sm text-green-700">
-                    {progresoGeneracionHorario.completados} / {progresoGeneracionHorario.total} viajes
-                  </p>
-                </div>
-                <div className="w-full bg-green-200 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                    style={{
-                      width: `${Math.min((progresoGeneracionHorario.completados / progresoGeneracionHorario.total) * 100, 100)}%`,
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
-
-          <DialogFooter className="flex-col sm:flex-row gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowGenerateNextMonthDialog(false);
-                setSelectedHorariosNextMonth(new Set());
-                setProgresoGeneracionHorario(null);
-              }}
-              className="w-full sm:w-auto touch-target"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleGenerateNextMonth}
-              disabled={generating || selectedHorariosNextMonth.size === 0}
-              className="w-full sm:w-auto touch-target"
-            >
-              {generating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Generar Viajes
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
