@@ -7,9 +7,11 @@ Esta guía te ayudará a encontrar y descargar los logos oficiales de YAPE, PLIN
 ## 🟣 YAPE (BCP)
 
 ### Opción 1: Wikimedia Commons (Recomendado - Oficial)
+
 **URL:** https://commons.wikimedia.org/wiki/File:Yape_peru_logotype.svg
 
 **Descarga directa:**
+
 - Haz clic en "Descargar" o usa este enlace directo:
   ```
   https://upload.wikimedia.org/wikipedia/commons/thumb/8/8a/Yape_peru_logotype.svg/512px-Yape_peru_logotype.svg.png
@@ -19,12 +21,14 @@ Esta guía te ayudará a encontrar y descargar los logos oficiales de YAPE, PLIN
 **Licencia:** Creative Commons Attribution-Share Alike 4.0 International
 
 ### Opción 2: Yape Negocios (Material Oficial)
+
 **URL:** https://www.yape.com.pe/preguntas-frecuentes/yape-negocios/
 
 - Puedes solicitar material publicitario oficial
 - También puedes acercarte a cualquier agencia BCP para recoger jalavistas y stickers
 
 ### Opción 3: Repositorio GitHub de Bancos
+
 **URL:** https://github.com/Tgentil/Bancos-em-SVG
 
 - Busca "Yape" o "BCP" en el repositorio
@@ -35,18 +39,22 @@ Esta guía te ayudará a encontrar y descargar los logos oficiales de YAPE, PLIN
 ## 🔵 PLIN (Interbank)
 
 ### Opción 1: Contactar Interbank (Recomendado)
+
 Como no hay fuente oficial pública, la mejor opción es:
+
 - Contactar directamente a Interbank
 - Solicitar el logo oficial para uso comercial
 - Email: atención al cliente o departamento de marketing
 
 ### Opción 2: Repositorio GitHub de Bancos
+
 **URL:** https://github.com/Tgentil/Bancos-em-SVG
 
 - Busca "Plin" o "Interbank"
 - Puede que encuentres variantes del logo
 
 ### Opción 3: Sitios de Logos
+
 - **Worldvectorlogo:** https://worldvectorlogo.com/es/logo/interbank
 - **Logo-teka:** Busca "Plin" o "Interbank"
 - **Icon-icons:** https://icon-icons.com (busca "plin")
@@ -60,14 +68,17 @@ Como no hay fuente oficial pública, la mejor opción es:
 Para el icono de efectivo, tienes varias opciones:
 
 ### Opción 1: Crear tu propio SVG
+
 Ya tienes un icono SVG personalizado en `components/ui/payment-icons.tsx` que puedes exportar.
 
 ### Opción 2: Iconos gratuitos
+
 - **Flaticon:** https://www.flaticon.com (busca "cash", "money", "billete")
 - **Icons8:** https://icons8.com (busca "cash" o "money")
 - **Lucide Icons:** Ya tienes `lucide-react` instalado, puedes usar `DollarSign` o `Banknote`
 
 ### Opción 3: Símbolo de Sol Peruano
+
 - Puedes usar el símbolo S/ (Sol peruano) como icono
 - Busca "sol peruano svg" en Google Images con filtro de uso comercial
 
@@ -76,28 +87,38 @@ Ya tienes un icono SVG personalizado en `components/ui/payment-icons.tsx` que pu
 ## 🌐 Sitios Generales de Logos (Útiles para ambos)
 
 ### 1. Worldvectorlogo
+
 **URL:** https://worldvectorlogo.com
+
 - Logos vectoriales de alta calidad
 - Formato SVG y PNG
 - Busca: "yape", "plin", "interbank", "bcp"
 
 ### 2. Logo-teka
+
 **URL:** https://logo-teka.com
+
 - Logos en SVG y PNG sin fondo
 - Colección extensa de marcas
 
 ### 3. LogosDown
+
 **URL:** https://logosdown.com
+
 - Plataforma colaborativa
 - Recursos gráficos gratuitos
 
 ### 4. Icon-icons
+
 **URL:** https://icon-icons.com
+
 - Iconos y logotipos en diversos formatos
 - Filtros por formato (SVG, PNG)
 
 ### 5. GitHub - Bancos-em-SVG
+
 **URL:** https://github.com/Tgentil/Bancos-em-SVG
+
 - Repositorio con logos de bancos en SVG
 - Alta resolución (2500x2500px)
 - Puede incluir YAPE y PLIN

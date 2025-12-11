@@ -13,18 +13,20 @@ Esta carpeta contiene todas las imágenes estáticas del proyecto.
 ## 📝 Uso en el código
 
 ### Con Next.js Image (recomendado)
+
 ```tsx
 import Image from 'next/image';
 
-<Image 
-  src="/images/logos/logo-transporte.svg" 
-  alt="Logo Transporte Fluvial" 
-  width={200} 
+<Image
+  src="/images/logos/logo-transporte.svg"
+  alt="Logo Transporte Fluvial"
+  width={200}
   height={50}
-/>
+/>;
 ```
 
 ### Con HTML img (para casos especiales)
+
 ```tsx
 <img src="/images/banners/hero-banner.jpg" alt="Banner principal" />
 ```

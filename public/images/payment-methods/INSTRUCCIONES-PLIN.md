@@ -3,14 +3,17 @@
 ## 🔍 Opciones Disponibles
 
 ### Opción 1: Logowik - Logo de Interbank en SVG (Más Fácil)
+
 **URL:** https://logowik.com/interbank-logo-vector-39378.html
 
 **Ventajas:**
+
 - ✅ Disponible directamente en formato SVG
 - ✅ No requiere conversión
 - ✅ Descarga directa
 
 **Pasos:**
+
 1. Visita la URL arriba
 2. Busca el botón de descarga "Download SVG" o similar
 3. Descarga el archivo SVG
@@ -19,9 +22,11 @@
 **Nota:** PLIN es el servicio de pagos de Interbank, así que el logo de Interbank es apropiado para representar PLIN.
 
 ### Opción 2: Brands of the World
+
 **URL:** https://www.brandsoftheworld.com/logo/plin-logo-ai
 
 **Pasos:**
+
 1. Visita la URL arriba
 2. Marca el checkbox "I Agree" para aceptar los términos
 3. Haz clic en el botón "Download" (puede aparecer después de marcar el checkbox)
@@ -32,6 +37,7 @@
    - O usa un convertidor online: https://convertio.co/ai-svg/
 
 ### Opción 2: Contactar Interbank Directamente
+
 **Recomendado para uso comercial**
 
 - **Email:** atención al cliente de Interbank
@@ -39,11 +45,13 @@
 - **Ventaja:** Obtienes logo oficial con permiso de uso comercial
 
 ### Opción 3: Buscar en Repositorios de GitHub
+
 **URL:** https://github.com/search?q=plin+logo+svg
 
 Busca repositorios que contengan logos de PLIN en formato SVG.
 
 ### Opción 4: Usar el Logo de Interbank como Base
+
 **URL:** https://www.brandsoftheworld.com/logo/interbank-1
 
 1. Descarga el logo de Interbank (formato EPS)
@@ -55,6 +63,7 @@ Busca repositorios que contengan logos de PLIN en formato SVG.
 ## 🎨 Colores Oficiales de PLIN
 
 Según el código existente en `components/ui/payment-icons.tsx`:
+
 - **Azul principal:** #00A3E0
 - **Cian:** #00D4FF
 
@@ -86,10 +95,5 @@ Una vez descargado, úsalo así:
 ```tsx
 import Image from 'next/image';
 
-<Image 
-  src="/images/payment-methods/plin-logo.svg" 
-  alt="PLIN" 
-  width={48} 
-  height={48}
-/>
+<Image src="/images/payment-methods/plin-logo.svg" alt="PLIN" width={48} height={48} />;
 ```

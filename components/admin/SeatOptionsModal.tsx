@@ -110,7 +110,18 @@ export function SeatOptionsModal({
 
   return (
     <>
-      <Dialog open={open && !showNewSaleModal} onOpenChange={onOpenChange}>
+      <Dialog
+        open={open && !showNewSaleModal}
+        onOpenChange={(isOpen) => {
+          // Solo cerrar el modal padre si el usuario lo cierra explícitamente
+          // y no cuando el modal hijo está abierto
+          if (!isOpen && !showNewSaleModal) {
+            onOpenChange(false);
+          }
+          // Si el usuario intenta cerrar pero el hijo está abierto, no hacer nada
+          // El hijo manejará su propio cierre
+        }}
+      >
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl flex items-center gap-2">

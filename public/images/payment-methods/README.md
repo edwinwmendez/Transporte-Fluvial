@@ -36,12 +36,7 @@ Si agregas imágenes aquí, puedes usarlas así:
 import Image from 'next/image';
 
 // Opción 1: Reemplazar los SVG actuales
-<Image 
-  src="/images/payment-methods/yape-logo.svg" 
-  alt="YAPE" 
-  width={48} 
-  height={48}
-/>
+<Image src="/images/payment-methods/yape-logo.svg" alt="YAPE" width={48} height={48} />;
 
 // Opción 2: Usar junto con los iconos SVG existentes
 // (por ejemplo, en modales o documentos)

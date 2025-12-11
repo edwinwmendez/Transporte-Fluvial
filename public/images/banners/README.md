@@ -31,11 +31,11 @@ Next.js optimiza automáticamente estas imágenes. Asegúrate de usar el compone
 ```tsx
 import Image from 'next/image';
 
-<Image 
-  src="/images/banners/hero-home.jpg" 
-  alt="Banner principal" 
-  width={1920} 
+<Image
+  src="/images/banners/hero-home.jpg"
+  alt="Banner principal"
+  width={1920}
   height={1080}
   priority // Para imágenes above-the-fold
-/>
+/>;
 ```

@@ -1,5 +1,9 @@
 'use client';
 
+import { Loader2 } from 'lucide-react';
+import { ReactNode } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -8,9 +12,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
-import { ReactNode } from 'react';
 
 interface FormDialogProps {
   open: boolean;
@@ -28,14 +29,14 @@ interface FormDialogProps {
 
 /**
  * Componente de diálogo genérico para formularios con validación integrada
- * 
+ *
  * Proporciona una estructura consistente para modales de formularios con:
  * - Header con título y descripción
  * - Área de contenido para el formulario
  * - Footer con botones de acción (cancelar y guardar)
  * - Estados de loading y disabled
  * - Manejo automático de submit del formulario
- * 
+ *
  * @param open - Controla si el diálogo está abierto
  * @param onOpenChange - Callback cuando cambia el estado de apertura
  * @param title - Título del diálogo
@@ -47,7 +48,7 @@ interface FormDialogProps {
  * @param loading - Si true, muestra spinner en el botón de envío
  * @param disabled - Si true, deshabilita el botón de envío
  * @param maxWidth - Ancho máximo del diálogo: 'sm' | 'md' | 'lg' | 'xl' | '2xl'
- * 
+ *
  * @example
  * ```tsx
  * <FormDialog
@@ -86,10 +87,16 @@ export function FormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className={maxWidthClasses[maxWidth]} aria-labelledby="dialog-title" aria-describedby={description ? "dialog-description" : undefined}>
+      <DialogContent
+        className={maxWidthClasses[maxWidth]}
+        aria-labelledby="dialog-title"
+        aria-describedby={description ? 'dialog-description' : undefined}
+      >
+        <DialogTitle id="dialog-title">{title || 'Diálogo'}</DialogTitle>
         <DialogHeader>
-          <DialogTitle id="dialog-title">{title}</DialogTitle>
-          {description && <DialogDescription id="dialog-description">{description}</DialogDescription>}
+          {description ? (
+            <DialogDescription id="dialog-description">{description}</DialogDescription>
+          ) : null}
         </DialogHeader>
 
         <form
@@ -114,8 +121,8 @@ export function FormDialog({
               {cancelLabel}
             </Button>
             {onSubmit && (
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 disabled={loading || disabled}
                 aria-label={submitLabel}
                 aria-busy={loading}
